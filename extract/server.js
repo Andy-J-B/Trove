@@ -41,7 +41,9 @@ app.get("/api/categories/:id", async (req, res) => {
   try {
     const category = await db.getCategoryById(req.params.id);
     if (!category) {
-      return res.status(404).json({ success: false, error: "Category not found" });
+      return res
+        .status(404)
+        .json({ success: false, error: "Category not found" });
     }
     res.json({ success: true, data: category });
   } catch (error) {
@@ -51,11 +53,13 @@ app.get("/api/categories/:id", async (req, res) => {
 
 app.post("/api/categories", async (req, res) => {
   try {
-    const { name } = req.body;
-    if (!name) {
-      return res.status(400).json({ success: false, error: "Name is required" });
+    const { name, description } = req.body;
+    if (!name || !description) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Name and Description is required" });
     }
-    const category = await db.createCategory(name);
+    const category = await db.createCategory(name, description);
     res.status(201).json({ success: true, data: category });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
@@ -64,11 +68,13 @@ app.post("/api/categories", async (req, res) => {
 
 app.put("/api/categories/:id", async (req, res) => {
   try {
-    const { name } = req.body;
-    if (!name) {
-      return res.status(400).json({ success: false, error: "Name is required" });
+    const { name, description } = req.body;
+    if (!name || !description) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Name and Description is required" });
     }
-    const category = await db.updateCategory(req.params.id, name);
+    const category = await db.updateCategory(req.params.id, name, description);
     res.json({ success: true, data: category });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
@@ -106,7 +112,9 @@ app.get("/api/products/:id", async (req, res) => {
   try {
     const product = await db.getProductById(req.params.id);
     if (!product) {
-      return res.status(404).json({ success: false, error: "Product not found" });
+      return res
+        .status(404)
+        .json({ success: false, error: "Product not found" });
     }
     res.json({ success: true, data: product });
   } catch (error) {
@@ -122,7 +130,7 @@ app.post("/api/products", async (req, res) => {
     if (!name || !category) {
       return res.status(400).json({
         success: false,
-        error: "Name and category are required"
+        error: "Name and category are required",
       });
     }
 
@@ -199,6 +207,7 @@ app.post("/extract-products", async (req, res) => {
 
     // Step 1: Get transcript from Scrape Creators API
     console.log("Fetching transcript for:", tiktokUrl);
+
     const transcript = await getTranscript(tiktokUrl);
 
     if (!transcript) {
@@ -217,11 +226,14 @@ app.post("/extract-products", async (req, res) => {
       try {
         const savedProduct = await db.addProduct({
           ...product,
-          tiktok_url: tiktokUrl
+          tiktok_url: tiktokUrl,
         });
         savedProducts.push(savedProduct);
       } catch (error) {
-        console.warn(`Failed to save product "${product.name}":`, error.message);
+        console.warn(
+          `Failed to save product "${product.name}":`,
+          error.message
+        );
       }
     }
 
@@ -231,7 +243,7 @@ app.post("/extract-products", async (req, res) => {
       transcript,
       products,
       savedProducts,
-      savedCount: savedProducts.length
+      savedCount: savedProducts.length,
     });
   } catch (error) {
     console.error("Error processing request:", error);
@@ -245,46 +257,46 @@ app.post("/extract-products", async (req, res) => {
 // Function to get transcript from Scrape Creators API
 async function getTranscript(tiktokUrl) {
   try {
-    // console.log("Making request to Scrape Creators API...");
-    // console.log("URL:", tiktokUrl);
-    // console.log("API Key present:", !!process.env.SCRAPE_CREATORS_API_KEY);
+    console.log("Making request to Scrape Creators API...");
+    console.log("URL:", tiktokUrl);
+    console.log("API Key present:", !!process.env.SCRAPE_CREATORS_API_KEY);
 
-    // const response = await axios.get(
-    //   "https://api.scrapecreators.com/v1/tiktok/video/transcript",
-    //   {
-    //     params: {
-    //       url: tiktokUrl,
-    //       language: "en",
-    //     },
-    //     headers: {
-    //       "x-api-key": process.env.SCRAPE_CREATORS_API_KEY,
-    //     },
-    //   }
-    // );
+    const response = await axios.get(
+      "https://api.scrapecreators.com/v1/tiktok/video/transcript",
+      {
+        params: {
+          url: tiktokUrl,
+          language: "en",
+        },
+        headers: {
+          "x-api-key": process.env.SCRAPE_CREATORS_API_KEY,
+        },
+      }
+    );
 
-    // console.log("API Response status:", response.status);
-    // console.log("API Response data:", JSON.stringify(response.data, null, 2));
+    console.log("API Response status:", response.status);
+    console.log("API Response data:", JSON.stringify(response.data, null, 2));
 
-    // // The API returns transcript data with timestamps
-    // const transcriptData = response.data;
+    // The API returns transcript data with timestamps
+    const transcriptData = response.data;
 
-    // // Extract just the text from the transcript segments
-    // if (transcriptData && Array.isArray(transcriptData)) {
-    //   return transcriptData
-    //     .map((segment) => segment.text || segment.content)
-    //     .join(" ");
-    // }
-    // console.log(
-    //   transcriptData.transcript ||
-    //     transcriptData.text ||
-    //     JSON.stringify(transcriptData)
-    // );
-    // // Fallback if the response format is different
-    // return (
-    //   transcriptData.transcript ||
-    //   transcriptData.text ||
-    //   JSON.stringify(transcriptData)
-    // );
+    // Extract just the text from the transcript segments
+    if (transcriptData && Array.isArray(transcriptData)) {
+      return transcriptData
+        .map((segment) => segment.text || segment.content)
+        .join(" ");
+    }
+    console.log(
+      transcriptData.transcript ||
+        transcriptData.text ||
+        JSON.stringify(transcriptData)
+    );
+    // Fallback if the response format is different
+    return (
+      transcriptData.transcript ||
+      transcriptData.text ||
+      JSON.stringify(transcriptData)
+    );
     return '{"utterances":[{"text":"no wonder you have acne you skip the most important step","start_time":80,"end_time":2520,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.9054263565891473,"source_height":0.15479651162790697},{"text":"your skincare every morning I do this exact routine","start_time":2521,"end_time":4600,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.9038759689922481,"source_height":0.15479651162790697},{"text":"I start with the centella cleansing oil removes dirt and oils","start_time":4601,"end_time":7040,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.9124031007751937,"source_height":0.15479651162790697},{"text":"I think I put a little too much","start_time":7041,"end_time":8080,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.8899224806201551,"source_height":0.11162790697674418},{"text":"then I wash this off nice","start_time":8081,"end_time":9920,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.7744186046511627,"source_height":0.11162790697674418},{"text":"then I go in with the ampoule foam","start_time":10046,"end_time":11206,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.8031007751937984,"source_height":0.11162790697674418},{"text":"Koreans know how to do one thing","start_time":11207,"end_time":12286,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.8612403100775193,"source_height":0.11162790697674418},{"text":"it\'s their skincare rub this in","start_time":12287,"end_time":13406,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.8503875968992248,"source_height":0.11162790697674418},{"text":"this is to remove all the dirt and oils","start_time":13407,"end_time":15186,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.9124031007751937,"source_height":0.11162790697674418},{"text":"you know what I like about these two","start_time":15187,"end_time":16156,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.8248062015503876,"source_height":0.11162790697674418},{"text":"it doesn\'t leave your skin feeling tight and dry","start_time":16157,"end_time":17796,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.8395348837209302,"source_height":0.15479651162790697},{"text":"favorites before I moisturize","start_time":17797,"end_time":19116,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.6984496124031008,"source_height":0.11162790697674418},{"text":"I usually go in with an ampoule ","start_time":19117,"end_time":20156,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.8682170542635659,"source_height":0.11162790697674418},{"text":"grab a few drops essentially a serum","start_time":20157,"end_time":21796,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.7596899224806202,"source_height":0.11162790697674418},{"text":"go like this keeps my skin shiny","start_time":21797,"end_time":23316,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.8434108527131784,"source_height":0.11162790697674418},{"text":"once I\'m done with the ampoule","start_time":23317,"end_time":24196,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.8984496124031007,"source_height":0.11162790697674418},{"text":"I use a moisturizer moisturizer helps keep my skin smooth and balanced","start_time":24197,"end_time":27116,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.8961240310077518,"source_height":0.19796511627906976},{"text":"locks in the hydration from the ampoule and prevents moisture loss","start_time":27117,"end_time":29676,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.8829457364341086,"source_height":0.15479651162790697},{"text":"lastly it\'s summer right now","start_time":29677,"end_time":30756,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.9015503875968993,"source_height":0.11162790697674418},{"text":"so I use sunscreen gotta protect myself from the UV rays","start_time":30757,"end_time":32916,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.813953488372093,"source_height":0.15479651162790697},{"text":"prevents skin cancer and signs of aging","start_time":32917,"end_time":34636,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.8364341085271318,"source_height":0.11162790697674418},{"text":"even if you\'re indoor still use sunscreen","start_time":34637,"end_time":36076,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.8108527131782947,"source_height":0.11162790697674418},{"text":"make sure you do it daily","start_time":36077,"end_time":36996,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.7891472868217054,"source_height":0.11162790697674418},{"text":"I won\'t gate keep anymore","start_time":36997,"end_time":37836,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.7062015503875969,"source_height":0.11162790697674418},{"text":"all of these are from skin 1","start_time":37837,"end_time":38756,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.8069767441860465,"source_height":0.11162790697674418},{"text":"0 0 4","start_time":38757,"end_time":39316,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.23953488372093024,"source_height":0.06802325581395349},{"text":"this right here is why I take care of my skin pretty quick routine","start_time":39317,"end_time":41676,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.8868217054263565,"source_height":0.15479651162790697},{"text":"Korean skincare","start_time":41677,"end_time":42307,"words":null,"text_size":28,"text_color":"#FFFFFFFF","bg_color":"#00000000","alignment":0,"source_width":0.651937984496124,"source_height":0.06802325581395349}]}';
   } catch (error) {
     console.error("Detailed error info:");
@@ -308,15 +320,28 @@ async function extractProducts(transcript) {
   try {
     // Parse the transcript JSON if it's a string
     let transcriptText = transcript;
-    if (typeof transcript === 'string') {
+    if (typeof transcript === "string") {
       try {
         const parsed = JSON.parse(transcript);
         if (parsed.utterances) {
-          transcriptText = parsed.utterances.map(u => u.text).join(' ');
+          transcriptText = parsed.utterances.map((u) => u.text).join(" ");
         }
       } catch (e) {
         // If it's not JSON, use as is
       }
+    }
+    var namesString, formattedString;
+    try {
+      const categories = await db.getAllCategories();
+
+      namesString = categories.map((category) => category.name).join(", ");
+      formattedString = categories
+        .map((category) => `${category.name}: ${category.description}`)
+        .join("\n");
+
+      console.log(categories, formattedString);
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
     }
 
     const prompt = `
@@ -326,22 +351,18 @@ Return ONLY a valid JSON array of products with this structure:
 [
   {
     "name": "Product name",
-    "category": "one of: clothing, skincare, haircare, makeup, lebron quotes, faker quotes",
+    "category": "one of: ${namesString}",
     "description": "Brief description based on context",
     "mentioned_context": "How it was mentioned in the video"
   }
 ]
 
 Categories explained:
-- skincare: cleansers, moisturizers, serums, sunscreen, etc.
-- haircare: shampoos, conditioners, styling products, etc.
-- makeup: foundation, lipstick, mascara, etc.
-- clothing: shirts, pants, shoes, accessories, etc.
-- lebron quotes: any quotes or sayings from LeBron James
-- faker quotes: any quotes or sayings from Faker (League of Legends player)
+${formattedString}
 
 Only include actual products (physical items, services, brands, apps, etc.) that are clearly mentioned or discussed.
-Do not include generic terms or concepts unless they refer to specific products.
+Do not include generic terms or concepts unless they refer to specific products. ONLY INCLUDE AT MOST 5 MAIN PRODUCTS. 
+Be as accurate as possible, Prioritize products with brand names.
 
 Transcript:
 "${transcriptText}"
@@ -352,7 +373,7 @@ Transcript:
 
     // Try to parse JSON
     try {
-      const cleanText = text.replace(/```json\n?|\n?```/g, '').trim();
+      const cleanText = text.replace(/```json\n?|\n?```/g, "").trim();
       return JSON.parse(cleanText);
     } catch (err) {
       console.warn("Gemini output was not valid JSON:", text);

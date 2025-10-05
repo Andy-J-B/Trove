@@ -244,6 +244,28 @@ export default function App() {
     })();
   }, [mode, shareIntent, resetShareIntent]);
 
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        // when app becomes active, start a 5s timer before processing
+        const timer = setTimeout(() => {
+          processQueue().then(async () => setQueued(await peekAll()));
+        }, 5000);
+        return () => clearTimeout(timer);
+      }
+    });
+
+    // also if the app is opened from cold start and is already active
+    if (AppState.currentState === "active") {
+      const timer = setTimeout(() => {
+        processQueue().then(async () => setQueued(await peekAll()));
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+    peekAll().then(setQueued);
+    return () => sub.remove();
+  }, []);
+
   // --- NORMAL MODE: process queue on foreground + once on open; also fetch categories
   useEffect(() => {
     if (Platform.OS !== "android") return;
@@ -251,18 +273,16 @@ export default function App() {
 
     const sub = AppState.addEventListener("change", async (state) => {
       if (state === "active") {
-        await processQueue();
         await fetchCategories();
       }
     });
 
     (async () => {
-      await processQueue();
       await fetchCategories();
     })();
 
     return () => sub.remove();
-  }, [mode, processQueue, fetchCategories]);
+  }, [mode, fetchCategories]);
 
   // Initial queue size (normal launches only)
   useEffect(() => {
