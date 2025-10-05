@@ -24,6 +24,7 @@ import { StatusBar } from "expo-status-bar";
 import axios from "axios";
 import { useShareIntent } from "expo-share-intent";
 import Constants from "expo-constants";
+import { Feather } from "@expo/vector-icons";
 
 import { enqueue, drain } from "./src/queue";
 
@@ -89,6 +90,7 @@ export default function App() {
 
   // Prevent double-handling a single share launch
   const shareHandledRef = useRef(false);
+  const queueTimerRef = useRef(null);
 
   // ---- helpers ----
   const ping = useCallback(async () => {
@@ -120,12 +122,12 @@ export default function App() {
     }
   }, [ping]);
 
-  const fetchCategories = useCallback(async () => {
+  const fetchCategories = useCallback(async (signal) => {
     const url = `${SERVER_URL}/categories`;
     setCatLoading(true);
     setCatError("");
     try {
-      const res = await axios.get(url, { timeout: 10000 });
+      const res = await axios.get(url, { timeout: 10000, signal });
       console.log(res);
 
       const payload = res?.data;
@@ -137,7 +139,7 @@ export default function App() {
           id: c.id ?? i + 1,
           key: String(c.id ?? i + 1),
           label: c.name,
-          icon: c.icon || "🗂️", // use server-provided emoji or default
+          icon: c.icon || "folder", // Feather's clean outline folder
         }))
       );
     } catch {
@@ -189,42 +191,84 @@ export default function App() {
     })();
   }, [mode, shareIntent, resetShareIntent]);
 
-  // Normal mode: process queue shortly after foreground; also fetch categories
+  // App.js (add near your share-handling effect)
+  useEffect(() => {
+    async function disableKeepAwakeIfSharing() {
+      if (!__DEV__) return;
+      if (Platform.OS !== "android") return;
+      if (!hasShareIntent || !shareIntent) return;
+      try {
+        const { deactivateKeepAwake } = await import("expo-keep-awake");
+        await deactivateKeepAwake(); // prevent the dev client from trying to keep screen on
+        console.log("KeepAwake deactivated for share launch");
+      } catch (e) {
+        console.log(
+          "KeepAwake deactivate failed (safe to ignore):",
+          e?.message || e
+        );
+      }
+    }
+    disableKeepAwakeIfSharing();
+  }, [hasShareIntent, shareIntent]);
+
   useEffect(() => {
     if (Platform.OS !== "android") return;
     if (mode !== "normal") return;
 
+    function onActive() {
+      // cancel any prior timer
+      if (queueTimerRef.current) {
+        clearTimeout(queueTimerRef.current);
+        queueTimerRef.current = null;
+      }
+      // abort controller for fetchCategories (if we background quickly)
+      const ac = new AbortController();
+
+      // 1) start categories fetch right away
+      fetchCategories(ac.signal);
+
+      // 2) schedule queue processing after 1s
+      queueTimerRef.current = setTimeout(() => {
+        queueTimerRef.current = null;
+        processQueue();
+      }, 1000);
+
+      // return a per-activation cleanup (we’ll call it when state changes)
+      return () => {
+        ac.abort();
+        if (queueTimerRef.current) {
+          clearTimeout(queueTimerRef.current);
+          queueTimerRef.current = null;
+        }
+      };
+    }
+
+    // Handle current state now
+    let cleanup = null;
+    if (AppState.currentState === "active") {
+      cleanup = onActive();
+    }
+
+    // Subscribe to future state changes
     const sub = AppState.addEventListener("change", (state) => {
+      // clean the previous activation resources
+      if (cleanup) cleanup();
+      cleanup = null;
       if (state === "active") {
-        const timer = setTimeout(() => {
-          processQueue();
-        }, 1000);
-        return () => clearTimeout(timer);
+        cleanup = onActive();
       }
     });
 
-    if (AppState.currentState === "active") {
-      const timer = setTimeout(() => {
-        processQueue();
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-
-    return () => sub.remove();
-  }, [mode, processQueue]);
-
-  useEffect(() => {
-    if (Platform.OS !== "android") return;
-    if (mode !== "normal") return;
-
-    const sub = AppState.addEventListener("change", async (state) => {
-      if (state === "active") await fetchCategories();
-    });
-    (async () => {
-      await fetchCategories();
-    })();
-    return () => sub.remove();
-  }, [mode, fetchCategories]);
+    // unmount
+    return () => {
+      sub.remove();
+      if (cleanup) cleanup();
+      if (queueTimerRef.current) {
+        clearTimeout(queueTimerRef.current);
+        queueTimerRef.current = null;
+      }
+    };
+  }, [mode, fetchCategories, processQueue]);
 
   // ---- Actions: Add Category ----
   const openAdd = () => {
@@ -331,7 +375,7 @@ export default function App() {
         </Pressable>
 
         <View style={styles.cardInner}>
-          <Text style={styles.cardIcon}>{item.icon}</Text>
+          <Feather name={item.icon} size={40} color="white" />
           <Text style={styles.cardLabel}>{item.label}</Text>
         </View>
       </View>
