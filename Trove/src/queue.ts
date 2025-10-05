@@ -20,3 +20,7 @@ export async function peekAll(): Promise<string[]> {
   const raw = (await AsyncStorage.getItem(KEY)) || "[]";
   return JSON.parse(raw) as string[];
 }
+
+export async function clearQueue(): Promise<void> {
+  await AsyncStorage.setItem(KEY, JSON.stringify([]));
+}

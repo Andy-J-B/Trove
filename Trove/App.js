@@ -13,9 +13,16 @@ import {
 import { useShareIntent } from "expo-share-intent";
 import { enqueue, drain, peekAll } from "./src/queue";
 import axios from "axios";
+import { clearQueue } from "./src/queue";
+
+async function handleResetQueue() {
+  await clearQueue();
+  console.log("🧹 Queue cleared!");
+  setQueued(0); // update your UI count
+}
 
 // Use your ngrok HTTPS URL (works on real Android devices)
-const BASE_URL = "https://abc123.ngrok.io";
+const BASE_URL = "http://localhost:3000";
 
 // 🔊 always log on startup
 console.log("🔥 App.js loaded");
@@ -175,6 +182,17 @@ export default function App() {
         }
         style={{ marginTop: 8 }}
       />
+      <Pressable
+        onPress={handleResetQueue}
+        style={{
+          marginTop: 16,
+          padding: 8,
+          backgroundColor: "#eee",
+          borderRadius: 4,
+        }}
+      >
+        <Text style={{ color: "red" }}>Reset Queue</Text>
+      </Pressable>
     </View>
   );
 }
