@@ -9,8 +9,10 @@ import {
   FlatList,
   Alert,
 } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useLocalSearchParams, Stack, router } from "expo-router";
 import Constants from "expo-constants";
+import SwipeableListItem from "../../components/swipeable-list-item";
 
 type Product = {
   id: string | number;
@@ -98,19 +100,13 @@ export default function CategoryScreen() {
     }
   }
 
-  function confirmDelete(id: string | number, label: string) {
-    Alert.alert("Delete item", `Remove "${label}"?`, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: () => deleteItem(id) },
-    ]);
-  }
+
 
   return (
-    <View style={styles.container}>
+    <GestureHandlerRootView style={styles.container}>
       <Stack.Screen
         options={{
           title,
-          headerBackTitleVisible: false,
           headerTintColor: "#fff",
           headerStyle: { backgroundColor: "#000" },
           headerTitleStyle: { color: "#fff", fontWeight: "800" },
@@ -142,37 +138,21 @@ export default function CategoryScreen() {
           data={items}
           keyExtractor={(it) => String(it.id)}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
-          renderItem={({ item }) => {
-            // Support either `name` or `title` from backend
-            const displayTitle = item.name || item.title || `#${item.id}`;
-            return (
-              <View style={styles.cardRow}>
-                <Pressable style={styles.card} onPress={() => {}}>
-                  <Text style={styles.cardTitle} numberOfLines={1}>
-                    {displayTitle}
-                  </Text>
-                  {!!item.description && (
-                    <Text style={styles.cardSubtitle} numberOfLines={2}>
-                      {item.description}
-                    </Text>
-                  )}
-                </Pressable>
-
-                <Pressable
-                  style={styles.deleteBtn}
-                  onPress={() => confirmDelete(item.id, displayTitle)}
-                >
-                  <Text style={styles.deleteText}>Delete</Text>
-                </Pressable>
-              </View>
-            );
-          }}
+          renderItem={({ item }) => (
+            <SwipeableListItem
+              item={item}
+              onDelete={deleteItem}
+              onPress={() => {
+                // Handle item press if needed
+              }}
+            />
+          )}
           contentContainerStyle={{ paddingBottom: 24 }}
           refreshing={refreshing}
           onRefresh={onRefresh}
         />
       )}
-    </View>
+    </GestureHandlerRootView>
   );
 }
 
@@ -186,29 +166,7 @@ const styles = StyleSheet.create({
   errorText: { color: "#ff6b6b", fontSize: 14 },
   centerRow: { flexDirection: "row", alignItems: "center", gap: 6 },
 
-  // Card with right-side delete button
-  cardRow: { flexDirection: "row", alignItems: "stretch", gap: 8 },
-  card: {
-    flex: 1,
-    backgroundColor: "#111",
-    padding: 12,
-    borderRadius: 10,
-  },
-  cardTitle: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  cardSubtitle: { color: "#bbb", marginTop: 4 },
 
-  deleteBtn: {
-    alignSelf: "stretch",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: "rgba(255, 59, 48, 0.15)",
-    borderColor: "rgba(255, 59, 48, 0.45)",
-    borderWidth: 1,
-    borderRadius: 10,
-    justifyContent: "center",
-    minWidth: 76,
-  },
-  deleteText: { color: "#ff6b6b", fontWeight: "800", textAlign: "center" },
 
   separator: { height: 10 },
 });
