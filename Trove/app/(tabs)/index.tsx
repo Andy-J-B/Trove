@@ -1,98 +1,193 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React from "react";
+import {
+  SafeAreaView,
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  FlatList,
+  Dimensions,
+  Platform,
+  Image,
+} from "react-native";
+import { router } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
+import { StatusBar } from "expo-status-bar";
+// You can also use @expo/vector-icons; here we’ll just render emoji placeholders for simplicity.
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+type Tile = {
+  key: string;
+  label: string;
+  icon: string;
+};
 
-export default function HomeScreen() {
+const TILE_LABELS = [
+  "Clothing",
+  "Skincare",
+  "Haircare",
+  "Makeup",
+  "Lebron",
+  "Faker",
+];
+
+const TILE_ICONS = ["👕", "🧴", "💈", "💄", "🏀", "🎮"];
+
+const TILES: Tile[] = (() => {
+  const tiles: Tile[] = [];
+  for (let index = 0; index < TILE_LABELS.length; index += 1) {
+    tiles.push({
+      key: `${index + 1}`,
+      label: TILE_LABELS[index],
+      icon: TILE_ICONS[index] ?? "",
+    });
+  }
+  return tiles;
+})();
+
+const { width, height } = Dimensions.get("window");
+const SCREEN_HORIZONTAL_PADDING = 12;
+const TILE_GAP = 14;
+const NUM_COLUMNS = 2;
+const CARD_WIDTH =
+  (width - SCREEN_HORIZONTAL_PADDING * 2 - TILE_GAP * (NUM_COLUMNS + 1)) /
+  NUM_COLUMNS;
+const CARD_HEIGHT = CARD_WIDTH * 0.95;
+const BOTTOM_SPACER = height * 0.125;
+const modernFontBold = Platform.select({
+  ios: "Helvetica Neue",
+  android: "Roboto",
+  default: "System",
+});
+
+export default function App() {
+  const renderItem = ({ item }: { item: Tile }) => (
+    <Pressable
+      onPress={() => router.push(`/category/${encodeURIComponent(item.label.toLowerCase())}`)}
+      style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
+    >
+      <View style={styles.card}>
+        <View style={styles.cardInner}>
+          <Text style={styles.cardIcon}>{item.icon}</Text>
+          <Text style={styles.cardLabel}>{item.label}</Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
+    <LinearGradient
+      colors={["#000000", "#070707", "#000000"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.container}
+    >
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.content}>
+          {/* Top: Centered logo area */}
+          <View style={styles.logoWrap}>
+            <View style={styles.logoRow}>
+              <Image
+                source={require("../../assets/images/logo.png")}
+                style={styles.logoImage}
+                resizeMode="contain"
               />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+              <Text style={styles.logoText}>TROVE</Text>
+            </View>
+          </View>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+          {/* Grid of 6 glass tiles */}
+          <FlatList
+            data={TILES}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.key}
+            numColumns={NUM_COLUMNS}
+            columnWrapperStyle={styles.row}
+            contentContainerStyle={styles.grid}
+            style={styles.list}
+            showsVerticalScrollIndicator={false}
+          />
+        </View>
+      </SafeAreaView>
+      <StatusBar style="light" />
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: { flex: 1 },
+  safe: {
+    flex: 1,
+    paddingHorizontal: SCREEN_HORIZONTAL_PADDING,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  content: {
+    flex: 1,
+    justifyContent: "flex-end",
+    paddingBottom: BOTTOM_SPACER,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  logoWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 0,
+    marginBottom: 6,
+  },
+  logoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logoImage: {
+    width: 64,
+    height: 64,
+    marginRight: 16,
+  },
+  logo: { width: 120, height: 48 },
+  logoText: {
+    color: "white",
+    fontSize: 44,
+    fontWeight: "900",
+    fontFamily: modernFontBold,
+    letterSpacing: 3,
+    textAlign: "center",
+  },
+
+  list: { flexGrow: 0 },
+  grid: {
+    justifyContent: "center",
+    paddingVertical: 20,
+    alignItems: "center",
+  },
+  row: { justifyContent: "center" },
+
+  card: {
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
+    borderRadius: 20,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "#1c1c1c",
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+    marginHorizontal: TILE_GAP / 2,
+    marginBottom: TILE_GAP + 6,
+  },
+  cardInner: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    padding: 14,
+    borderRadius: 20,
+  },
+  cardIcon: { fontSize: 40 },
+  cardLabel: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+    fontFamily: modernFontBold,
   },
 });
