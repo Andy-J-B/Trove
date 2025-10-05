@@ -18,15 +18,13 @@ export default function AppWithSplash({ children }: AppWithSplashProps) {
     async function prepare() {
       try {
         // Pre-load fonts, make any API calls you need to do here
-        // For now, we'll just wait a moment
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Keep this minimal to avoid delays
+        await new Promise(resolve => setTimeout(resolve, 50));
       } catch (e) {
         console.warn(e);
       } finally {
         // Tell the application to render
         setAppIsReady(true);
-        // Hide the native splash screen
-        await SplashScreen.hideAsync();
       }
     }
 
@@ -37,11 +35,18 @@ export default function AppWithSplash({ children }: AppWithSplashProps) {
     setIsShowingSplash(false);
   };
 
+  // Show custom splash screen immediately when app is ready
   if (!appIsReady || isShowingSplash) {
     return (
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, backgroundColor: '#000000' }}>
         {appIsReady && (
-          <SplashScreenComponent onAnimationComplete={handleSplashComplete} />
+          <SplashScreenComponent 
+            onAnimationComplete={handleSplashComplete}
+            onStart={() => {
+              // Hide native splash screen when custom animation starts
+              SplashScreen.hideAsync();
+            }}
+          />
         )}
       </View>
     );

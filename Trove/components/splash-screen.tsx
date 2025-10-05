@@ -14,9 +14,10 @@ const { width, height } = Dimensions.get('window');
 
 interface SplashScreenProps {
   onAnimationComplete: () => void;
+  onStart?: () => void;
 }
 
-export default function SplashScreen({ onAnimationComplete }: SplashScreenProps) {
+export default function SplashScreen({ onAnimationComplete, onStart }: SplashScreenProps) {
   const pickaxeRotation = useSharedValue(0);
   const pickaxeTranslateY = useSharedValue(0);
   const chestScale = useSharedValue(1);
@@ -24,6 +25,9 @@ export default function SplashScreen({ onAnimationComplete }: SplashScreenProps)
   const fadeOut = useSharedValue(1);
 
   useEffect(() => {
+    // Call onStart immediately to hide native splash
+    onStart?.();
+    
     // Start the animation sequence
     const startAnimation = () => {
       // Pickaxe swing animation
@@ -67,9 +71,10 @@ export default function SplashScreen({ onAnimationComplete }: SplashScreenProps)
       );
     };
 
-    const timer = setTimeout(startAnimation, 500);
+    // Start animation immediately, no delay
+    const timer = setTimeout(startAnimation, 100);
     return () => clearTimeout(timer);
-  }, []);
+  }, [onStart]);
 
   const pickaxeAnimatedStyle = useAnimatedStyle(() => ({
     transform: [
