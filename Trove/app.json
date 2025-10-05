@@ -21,7 +21,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.andybae.trove"
+      "package": "com.andybae.trove",
+      "usesCleartextTraffic": false
     },
     "web": {
       "output": "static",
