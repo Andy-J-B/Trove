@@ -13,37 +13,33 @@ import {
   AppState,
   BackHandler,
   ToastAndroid,
+  RefreshControl,
 } from "react-native";
 import { router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import axios from "axios";
 import { useShareIntent } from "expo-share-intent";
+import Constants from "expo-constants";
+// If you're using react-native-dotenv, you can also:
+// import { SERVER_URL as ENV_SERVER_URL } from "@env";
 
 import { enqueue, drain, peekAll, clearQueue } from "./src/queue";
 
 // ---------- CONFIG ----------
-// For USB + `adb reverse tcp:3000 tcp:3000`, 127.0.0.1 is safest.
-const BASE_URL = "http://127.0.0.1:3000";
+// For the extract-products route you already had:
+const EXTRACT_BASE = "http://127.0.0.1:3000"; // keep your previous behavior (use adb reverse)
+// Server URL for categories comes from env:
+const SERVER_URL =
+  // Prefer Expo extra
+  (Constants?.expoConfig?.extra && Constants.expoConfig.extra.SERVER_URL) ||
+  // Or dotenv if you use it: ENV_SERVER_URL ||
+  "http://127.0.0.1:3000/api";
 // ----------------------------
 
 console.log("🔥 App.js loaded");
 
-const TILE_LABELS = [
-  "Clothing",
-  "Skincare",
-  "Haircare",
-  "Makeup",
-  "Lebron",
-  "Faker",
-];
-const TILE_ICONS = ["👕", "🧴", "💈", "💄", "🏀", "🎮"];
-const TILES = TILE_LABELS.map((label, i) => ({
-  key: String(i + 1),
-  label,
-  icon: TILE_ICONS[i] || "",
-}));
-
+// ---- UI constants
 const { width, height } = Dimensions.get("window");
 const SCREEN_HORIZONTAL_PADDING = 12;
 const TILE_GAP = 14;
@@ -59,6 +55,25 @@ const modernFontBold = Platform.select({
   default: "System",
 });
 
+// Fallback tiles if API isn’t reachable
+const FALLBACK_TILE_LABELS = [
+  "Clothing",
+  "Skincare",
+  "Haircare",
+  "Makeup",
+  "Lebron",
+  "Faker",
+];
+const ICONS = {
+  clothing: "👕",
+  skincare: "🧴",
+  haircare: "💈",
+  makeup: "💄",
+  lebron: "🏀",
+  faker: "🎮",
+};
+const iconFor = (name) => ICONS[name?.toLowerCase?.()] || "🗂️";
+
 export default function App() {
   console.log("🔥 App component rendered");
 
@@ -70,13 +85,18 @@ export default function App() {
   const lastResult = results[0]?.result || "";
   const [mode, setMode] = useState("unknown"); // "unknown" | "share" | "normal"
 
+  // categories state
+  const [categories, setCategories] = useState([]); // [{ id?, name }]
+  const [catLoading, setCatLoading] = useState(false);
+  const [catError, setCatError] = useState("");
+
   // Prevent double-handling a single share launch
   const shareHandledRef = useRef(false);
 
   // ---- helpers ----
   const ping = useCallback(async () => {
     try {
-      const r = await axios.get(`${BASE_URL}/health`, { timeout: 5000 });
+      const r = await axios.get(`${EXTRACT_BASE}/health`, { timeout: 5000 });
       console.log("🌐 Health OK:", r.status, r.data);
       return true;
     } catch (e) {
@@ -98,7 +118,7 @@ export default function App() {
     for (const url of urls) {
       try {
         const res = await axios.post(
-          `${BASE_URL}/extract-products`,
+          `${EXTRACT_BASE}/extract-products`,
           { tiktokUrl: url },
           { timeout: 15000 }
         );
@@ -126,6 +146,42 @@ export default function App() {
     setQueued(0);
   }, []);
 
+  // ---- categories fetcher (uses SERVER_URL env) ----
+  const fetchCategories = useCallback(async () => {
+    const base = String(SERVER_URL).replace(/\/$/, "");
+    const url = `${base}/categories`;
+    setCatLoading(true);
+    setCatError("");
+    try {
+      const res = await axios.get(url, { timeout: 10000 });
+      const payload = res?.data;
+      if (!payload?.success) throw new Error(payload?.error || "Unknown error");
+      const data = Array.isArray(payload.data) ? payload.data : [];
+      // Expecting [{ id, name }, ...]
+      setCategories(
+        data.map((c, i) => ({
+          key: String(c.id ?? i + 1),
+          label: c.name,
+          icon: iconFor(c.name),
+        }))
+      );
+      console.log("📦 Categories loaded:", data.length);
+    } catch (e) {
+      console.warn("❌ Categories fetch failed:", e?.message || e);
+      setCatError(e?.message || "Failed to load categories");
+      // fallback to static
+      setCategories(
+        FALLBACK_TILE_LABELS.map((label, i) => ({
+          key: String(i + 1),
+          label,
+          icon: iconFor(label),
+        }))
+      );
+    } finally {
+      setCatLoading(false);
+    }
+  }, []);
+
   // Decide mode (share vs normal) once useShareIntent resolves
   useEffect(() => {
     if (Platform.OS !== "android") {
@@ -135,7 +191,8 @@ export default function App() {
     if (hasShareIntent && shareIntent) setMode("share");
     else if (hasShareIntent === false) setMode("normal");
   }, [hasShareIntent, shareIntent]);
-  // App.js (add near your share-handling effect)
+
+  // In dev, prevent Expo Dev Client keep-awake during share launches
   useEffect(() => {
     async function disableKeepAwakeIfSharing() {
       if (!__DEV__) return;
@@ -143,7 +200,7 @@ export default function App() {
       if (!hasShareIntent || !shareIntent) return;
       try {
         const { deactivateKeepAwake } = await import("expo-keep-awake");
-        await deactivateKeepAwake(); // prevent the dev client from trying to keep screen on
+        await deactivateKeepAwake();
         console.log("KeepAwake deactivated for share launch");
       } catch (e) {
         console.log(
@@ -187,7 +244,7 @@ export default function App() {
     })();
   }, [mode, shareIntent, resetShareIntent]);
 
-  // --- NORMAL MODE: process queue on foreground + once on open
+  // --- NORMAL MODE: process queue on foreground + once on open; also fetch categories
   useEffect(() => {
     if (Platform.OS !== "android") return;
     if (mode !== "normal") return;
@@ -195,15 +252,17 @@ export default function App() {
     const sub = AppState.addEventListener("change", async (state) => {
       if (state === "active") {
         await processQueue();
+        await fetchCategories();
       }
     });
 
     (async () => {
       await processQueue();
+      await fetchCategories();
     })();
 
     return () => sub.remove();
-  }, [mode, processQueue]);
+  }, [mode, processQueue, fetchCategories]);
 
   // Initial queue size (normal launches only)
   useEffect(() => {
@@ -253,12 +312,7 @@ export default function App() {
           </View>
 
           <View style={{ flexDirection: "row", gap: 8 }}>
-            <Pressable
-              onPress={async () => {
-                await processQueue();
-              }}
-              style={styles.resetBtn}
-            >
+            <Pressable onPress={processQueue} style={styles.resetBtn}>
               <Text style={styles.resetBtnText}>Process Now</Text>
             </Pressable>
 
@@ -281,7 +335,7 @@ export default function App() {
           </View>
 
           <FlatList
-            data={TILES}
+            data={categories} // <-- dynamic data from API (fallback applied if needed)
             renderItem={renderItem}
             keyExtractor={(item) => item.key}
             numColumns={NUM_COLUMNS}
@@ -289,6 +343,26 @@ export default function App() {
             contentContainerStyle={styles.grid}
             style={styles.list}
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={catLoading}
+                onRefresh={fetchCategories}
+                tintColor="#fff"
+              />
+            }
+            ListHeaderComponent={
+              catError ? (
+                <Text
+                  style={{
+                    color: "#ff8a8a",
+                    textAlign: "center",
+                    marginBottom: 6,
+                  }}
+                >
+                  {catError}
+                </Text>
+              ) : null
+            }
           />
 
           <View style={styles.resultBox}>
@@ -359,7 +433,7 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 20,
   },
-  cardIcon: { fontSize: 40 },
+  cardIcon: { fontSize: 40, color: "#fff" },
   cardLabel: {
     color: "white",
     fontSize: 16,

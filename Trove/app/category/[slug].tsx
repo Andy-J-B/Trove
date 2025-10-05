@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+// app/category/[slug].tsx (CategoryScreen)
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,8 +7,17 @@ import {
   Pressable,
   ActivityIndicator,
   FlatList,
+  Alert,
 } from "react-native";
 import { useLocalSearchParams, Stack, router } from "expo-router";
+import Constants from "expo-constants";
+
+type Product = {
+  id: string | number;
+  name?: string;
+  title?: string;
+  description?: string;
+};
 
 function titleCase(s: string) {
   if (!s) return "";
@@ -17,59 +27,83 @@ function titleCase(s: string) {
     .join(" ");
 }
 
+// Resolve SERVER_URL from env (should be like "http://localhost:3000/api")
+const SERVER_URL: string =
+  (Constants?.expoConfig?.extra as any)?.SERVER_URL ||
+  "http://127.0.0.1:3000/api";
+
 export default function CategoryScreen() {
   const params = useLocalSearchParams();
   const slug = String(params.slug ?? "");
+  const category = slug.toLowerCase(); // <-- use this for API query
   const title = titleCase(slug);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [items, setItems] = useState<Array<{ id: string; title: string; description: string }>>([]);
 
-  // Minimal in-memory mock DB for demo purposes
-  const db = useMemo(
-    () =>
-      ({
-        clothing: [
-          { id: "c1", title: "Basic Tee", description: "Soft cotton crewneck, everyday essential." },
-          { id: "c2", title: "Slim Jeans", description: "Stretch denim with a tailored fit." },
-          { id: "c3", title: "Hoodie", description: "Cozy fleece with kangaroo pocket." },
-          { id: "c4", title: "Chino Pants", description: "Smart casual pants with 2-way stretch." },
-          { id: "c5", title: "Puffer Jacket", description: "Lightweight insulation for colder days." },
-        ],
-        skincare: [
-          { id: "s1", title: "Hydrating Serum", description: "Hyaluronic acid boost for dry skin." },
-          { id: "s2", title: "SPF 50 Sunscreen", description: "Broad-spectrum protection, non-greasy finish." },
-          { id: "s3", title: "Gentle Cleanser", description: "Sulfate-free face wash for daily use." },
-          { id: "s4", title: "Night Repair Cream", description: "Retinol-infused for smoother texture." },
-        ],
-        lebron: [
-          { id: "l1", title: "LeBron 21", description: "Signature performance basketball shoe." },
-          { id: "l2", title: "Witness Tee", description: "Graphic tee celebrating the King." },
-          { id: "l3", title: "LeBron Hoodie", description: "Warm fleece with team graphic." },
-        ],
-      }) as Record<string, Array<{ id: string; title: string; description: string }>>,
-    []
-  );
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [items, setItems] = useState<Array<Product>>([]);
+
+  const base = useMemo(() => String(SERVER_URL).replace(/\/$/, ""), []);
+
+  const loadItems = useCallback(async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `${base}/products?category=${encodeURIComponent(category)}`
+      );
+      const json = await res.json();
+      if (!json?.success)
+        throw new Error(json?.error || "Failed to fetch products");
+      // API returns { success, data: Product[] }
+      const rows: Product[] = Array.isArray(json.data) ? json.data : [];
+      setItems(rows);
+    } catch (e: any) {
+      setError(e?.message ?? "Failed to load products");
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [base, category]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadItems();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadItems]);
 
   useEffect(() => {
     let mounted = true;
-    setLoading(true);
-    setError(null);
-
-    try {
-      const key = slug.toLowerCase();
-      const data = db[key] ?? [];
-      if (mounted) setItems(data);
-    } catch (e: any) {
-      if (mounted) setError(e?.message ?? "Failed to load data");
-    } finally {
-      if (mounted) setLoading(false);
-    }
-
+    (async () => {
+      if (!mounted) return;
+      await loadItems();
+    })();
     return () => {
       mounted = false;
     };
-  }, [slug, db]);
+  }, [loadItems]);
+
+  async function deleteItem(id: string | number) {
+    try {
+      const res = await fetch(`${base}/products/${id}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!json?.success) throw new Error(json?.error || "Delete failed");
+      // Optimistically remove from list
+      setItems((prev) => prev.filter((p) => String(p.id) !== String(id)));
+    } catch (e: any) {
+      Alert.alert("Delete failed", e?.message ?? "Unable to delete item.");
+    }
+  }
+
+  function confirmDelete(id: string | number, label: string) {
+    Alert.alert("Delete item", `Remove "${label}"?`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: () => deleteItem(id) },
+    ]);
+  }
 
   return (
     <View style={styles.container}>
@@ -81,13 +115,19 @@ export default function CategoryScreen() {
           headerStyle: { backgroundColor: "#000" },
           headerTitleStyle: { color: "#fff", fontWeight: "800" },
           headerLeft: () => (
-            <Pressable onPress={() => router.back()} hitSlop={10} style={styles.backBtn}>
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={10}
+              style={styles.backBtn}
+            >
               <Text style={styles.backText}>←</Text>
             </Pressable>
           ),
         }}
       />
+
       <Text style={styles.title}>{title}</Text>
+
       {loading ? (
         <View style={styles.centerRow}>
           <ActivityIndicator color="#fff" />
@@ -100,17 +140,36 @@ export default function CategoryScreen() {
       ) : (
         <FlatList
           data={items}
-          keyExtractor={(it) => it.id}
+          keyExtractor={(it) => String(it.id)}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
-          renderItem={({ item }) => (
-            <Pressable style={styles.card} onPress={() => {}}>
-              <Text style={styles.cardTitle}>{item.title}</Text>
-              <Text style={styles.cardSubtitle} numberOfLines={2}>
-                {item.description}
-              </Text>
-            </Pressable>
-          )}
+          renderItem={({ item }) => {
+            // Support either `name` or `title` from backend
+            const displayTitle = item.name || item.title || `#${item.id}`;
+            return (
+              <View style={styles.cardRow}>
+                <Pressable style={styles.card} onPress={() => {}}>
+                  <Text style={styles.cardTitle} numberOfLines={1}>
+                    {displayTitle}
+                  </Text>
+                  {!!item.description && (
+                    <Text style={styles.cardSubtitle} numberOfLines={2}>
+                      {item.description}
+                    </Text>
+                  )}
+                </Pressable>
+
+                <Pressable
+                  style={styles.deleteBtn}
+                  onPress={() => confirmDelete(item.id, displayTitle)}
+                >
+                  <Text style={styles.deleteText}>Delete</Text>
+                </Pressable>
+              </View>
+            );
+          }}
           contentContainerStyle={{ paddingBottom: 24 }}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
         />
       )}
     </View>
@@ -121,22 +180,35 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000", padding: 16 },
   backBtn: { paddingHorizontal: 8, paddingVertical: 4 },
   backText: { color: "#fff", fontSize: 20 },
-  title: {
-    color: "#fff",
-    fontSize: 24,
-    fontWeight: "800",
-    marginBottom: 12,
-  },
+  title: { color: "#fff", fontSize: 24, fontWeight: "800", marginBottom: 12 },
   subtitle: { color: "#aaa", fontSize: 14 },
   loadingText: { color: "#fff", marginLeft: 8 },
   errorText: { color: "#ff6b6b", fontSize: 14 },
   centerRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+
+  // Card with right-side delete button
+  cardRow: { flexDirection: "row", alignItems: "stretch", gap: 8 },
   card: {
+    flex: 1,
     backgroundColor: "#111",
     padding: 12,
     borderRadius: 10,
   },
   cardTitle: { color: "#fff", fontSize: 16, fontWeight: "700" },
   cardSubtitle: { color: "#bbb", marginTop: 4 },
+
+  deleteBtn: {
+    alignSelf: "stretch",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: "rgba(255, 59, 48, 0.15)",
+    borderColor: "rgba(255, 59, 48, 0.45)",
+    borderWidth: 1,
+    borderRadius: 10,
+    justifyContent: "center",
+    minWidth: 76,
+  },
+  deleteText: { color: "#ff6b6b", fontWeight: "800", textAlign: "center" },
+
   separator: { height: 10 },
 });
