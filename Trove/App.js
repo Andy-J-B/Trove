@@ -21,25 +21,16 @@ import { StatusBar } from "expo-status-bar";
 import axios from "axios";
 import { useShareIntent } from "expo-share-intent";
 import Constants from "expo-constants";
-// If you're using react-native-dotenv, you can also:
-// import { SERVER_URL as ENV_SERVER_URL } from "@env";
 
 import { enqueue, drain, peekAll, clearQueue } from "./src/queue";
 
 // ---------- CONFIG ----------
-// For the extract-products route you already had:
-const EXTRACT_BASE = "http://127.0.0.1:3000"; // keep your previous behavior (use adb reverse)
-// Server URL for categories comes from env:
+const EXTRACT_BASE = "http://127.0.0.1:3000"; // use adb reverse in dev; replace for prod builds
 const SERVER_URL =
-  // Prefer Expo extra
   (Constants?.expoConfig?.extra && Constants.expoConfig.extra.SERVER_URL) ||
-  // Or dotenv if you use it: ENV_SERVER_URL ||
   "http://127.0.0.1:3000/api";
 // ----------------------------
 
-console.log("🔥 App.js loaded");
-
-// ---- UI constants
 const { width, height } = Dimensions.get("window");
 const SCREEN_HORIZONTAL_PADDING = 12;
 const TILE_GAP = 14;
@@ -55,7 +46,6 @@ const modernFontBold = Platform.select({
   default: "System",
 });
 
-// Fallback tiles if API isn’t reachable
 const FALLBACK_TILE_LABELS = [
   "Clothing",
   "Skincare",
@@ -75,18 +65,13 @@ const ICONS = {
 const iconFor = (name) => ICONS[name?.toLowerCase?.()] || "🗂️";
 
 export default function App() {
-  console.log("🔥 App component rendered");
-
-  const { hasShareIntent, shareIntent, resetShareIntent, error } =
-    useShareIntent();
+  const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
 
   const [queued, setQueued] = useState(0);
-  const [results, setResults] = useState([]); // [{id, url, result}]
-  const lastResult = results[0]?.result || "";
   const [mode, setMode] = useState("unknown"); // "unknown" | "share" | "normal"
 
   // categories state
-  const [categories, setCategories] = useState([]); // [{ id?, name }]
+  const [categories, setCategories] = useState([]); // [{ key, label, icon }]
   const [catLoading, setCatLoading] = useState(false);
   const [catError, setCatError] = useState("");
 
@@ -96,57 +81,39 @@ export default function App() {
   // ---- helpers ----
   const ping = useCallback(async () => {
     try {
-      const r = await axios.get(`${EXTRACT_BASE}/health`, { timeout: 5000 });
-      console.log("🌐 Health OK:", r.status, r.data);
+      await axios.get(`${EXTRACT_BASE}/health`, { timeout: 5000 });
       return true;
-    } catch (e) {
-      console.warn("🌐 Health FAIL:", e?.message);
+    } catch {
       return false;
     }
   }, []);
 
   const processQueue = useCallback(async () => {
     const ok = await ping();
-    if (!ok) {
-      console.warn("🚫 Backend not reachable; will retry later");
-      return;
-    }
+    if (!ok) return;
 
     const urls = await drain();
-    console.log("🧹 Drain:", urls);
-
     for (const url of urls) {
       try {
-        const res = await axios.post(
+        await axios.post(
           `${EXTRACT_BASE}/extract-products`,
           { tiktokUrl: url },
           { timeout: 15000 }
         );
-        const text =
-          typeof res.data === "string" ? res.data : JSON.stringify(res.data);
-        console.log("✅ API OK:", text);
-
-        setResults((prev) => [
-          { id: `${Date.now()}-${Math.random()}`, url, result: text },
-          ...prev,
-        ]);
-      } catch (e) {
-        console.warn("⚠️ API fail, re-queue:", url, e?.message || e);
+      } catch {
         await enqueue(url);
-        break; // avoid tight loop if network is down
+        break;
       }
     }
-
     peekAll().then((q) => setQueued(q.length));
   }, [ping]);
 
   const handleResetQueuePress = useCallback(async () => {
     await clearQueue();
-    console.log("🧹 Queue cleared!");
     setQueued(0);
   }, []);
 
-  // ---- categories fetcher (uses SERVER_URL env) ----
+  // ---- categories fetcher ----
   const fetchCategories = useCallback(async () => {
     const base = String(SERVER_URL).replace(/\/$/, "");
     const url = `${base}/categories`;
@@ -155,9 +122,8 @@ export default function App() {
     try {
       const res = await axios.get(url, { timeout: 10000 });
       const payload = res?.data;
-      if (!payload?.success) throw new Error(payload?.error || "Unknown error");
+      if (!payload?.success) throw new Error(payload?.error || "Error");
       const data = Array.isArray(payload.data) ? payload.data : [];
-      // Expecting [{ id, name }, ...]
       setCategories(
         data.map((c, i) => ({
           key: String(c.id ?? i + 1),
@@ -165,11 +131,8 @@ export default function App() {
           icon: iconFor(c.name),
         }))
       );
-      console.log("📦 Categories loaded:", data.length);
     } catch (e) {
-      console.warn("❌ Categories fetch failed:", e?.message || e);
-      setCatError(e?.message || "Failed to load categories");
-      // fallback to static
+      setCatError("Failed to load categories");
       setCategories(
         FALLBACK_TILE_LABELS.map((label, i) => ({
           key: String(i + 1),
@@ -182,7 +145,7 @@ export default function App() {
     }
   }, []);
 
-  // Decide mode (share vs normal) once useShareIntent resolves
+  // Decide mode
   useEffect(() => {
     if (Platform.OS !== "android") {
       setMode("normal");
@@ -192,27 +155,7 @@ export default function App() {
     else if (hasShareIntent === false) setMode("normal");
   }, [hasShareIntent, shareIntent]);
 
-  // In dev, prevent Expo Dev Client keep-awake during share launches
-  useEffect(() => {
-    async function disableKeepAwakeIfSharing() {
-      if (!__DEV__) return;
-      if (Platform.OS !== "android") return;
-      if (!hasShareIntent || !shareIntent) return;
-      try {
-        const { deactivateKeepAwake } = await import("expo-keep-awake");
-        await deactivateKeepAwake();
-        console.log("KeepAwake deactivated for share launch");
-      } catch (e) {
-        console.log(
-          "KeepAwake deactivate failed (safe to ignore):",
-          e?.message || e
-        );
-      }
-    }
-    disableKeepAwakeIfSharing();
-  }, [hasShareIntent, shareIntent]);
-
-  // --- SHARE MODE: enqueue + exit back to TikTok (NO draining)
+  // --- SHARE MODE: enqueue + exit (NO draining)
   useEffect(() => {
     if (Platform.OS !== "android") return;
     if (mode !== "share") return;
@@ -222,32 +165,28 @@ export default function App() {
     (async () => {
       try {
         const url = shareIntent?.webUrl || shareIntent?.text || "";
-        console.log("📩 Share received, URL:", url);
-
         if (url) {
           await enqueue(url);
-          console.log("🧺 Enqueued:", url);
           try {
             ToastAndroid.show("Saved to Trove", ToastAndroid.SHORT);
           } catch {}
           peekAll().then((q) => setQueued(q.length));
-        } else {
-          console.log("ℹ️ Share payload had no URL");
         }
-
         resetShareIntent();
-        setTimeout(() => BackHandler.exitApp(), 200); // bounce back to TikTok
-      } catch (e) {
-        console.warn("❌ Share enqueue failed:", e);
-        // Don't exit; let UI load so you can debug
+        setTimeout(() => BackHandler.exitApp(), 200);
+      } catch {
+        // fall through to UI if enqueue fails
       }
     })();
   }, [mode, shareIntent, resetShareIntent]);
 
+  // Process on foreground (normal mode) with a short delay; also fetch categories
   useEffect(() => {
+    if (Platform.OS !== "android") return;
+    if (mode !== "normal") return;
+
     const sub = AppState.addEventListener("change", (state) => {
       if (state === "active") {
-        // when app becomes active, start a 5s timer before processing
         const timer = setTimeout(() => {
           processQueue().then(async () => setQueued(await peekAll()));
         }, 5000);
@@ -255,43 +194,38 @@ export default function App() {
       }
     });
 
-    // also if the app is opened from cold start and is already active
     if (AppState.currentState === "active") {
       const timer = setTimeout(() => {
         processQueue().then(async () => setQueued(await peekAll()));
       }, 5000);
       return () => clearTimeout(timer);
     }
+
     peekAll().then(setQueued);
     return () => sub.remove();
-  }, []);
+  }, [mode, processQueue]);
 
-  // --- NORMAL MODE: process queue on foreground + once on open; also fetch categories
   useEffect(() => {
     if (Platform.OS !== "android") return;
     if (mode !== "normal") return;
 
     const sub = AppState.addEventListener("change", async (state) => {
-      if (state === "active") {
-        await fetchCategories();
-      }
+      if (state === "active") await fetchCategories();
     });
-
     (async () => {
       await fetchCategories();
     })();
-
     return () => sub.remove();
   }, [mode, fetchCategories]);
 
-  // Initial queue size (normal launches only)
+  // Initial queue size (normal launches)
   useEffect(() => {
     if (Platform.OS !== "android") return;
     if (mode !== "normal") return;
     peekAll().then((q) => setQueued(q.length));
   }, [mode]);
 
-  // If launched via share, render almost nothing so exit is instant
+  // Share launch: render nothing (fast exit)
   if (Platform.OS === "android" && mode === "share") {
     return <View style={{ flex: 1, backgroundColor: "transparent" }} />;
   }
@@ -324,18 +258,9 @@ export default function App() {
         <View style={styles.topBar}>
           <View style={styles.statusPill}>
             <Text style={styles.statusText}>Queued: {queued}</Text>
-            {!!error && (
-              <Text style={[styles.statusText, { color: "#ff7a7a" }]}>
-                {String(error)}
-              </Text>
-            )}
           </View>
 
           <View style={{ flexDirection: "row", gap: 8 }}>
-            <Pressable onPress={processQueue} style={styles.resetBtn}>
-              <Text style={styles.resetBtnText}>Process Now</Text>
-            </Pressable>
-
             <Pressable onPress={handleResetQueuePress} style={styles.resetBtn}>
               <Text style={styles.resetBtnText}>Reset Queue</Text>
             </Pressable>
@@ -355,7 +280,7 @@ export default function App() {
           </View>
 
           <FlatList
-            data={categories} // <-- dynamic data from API (fallback applied if needed)
+            data={categories}
             renderItem={renderItem}
             keyExtractor={(item) => item.key}
             numColumns={NUM_COLUMNS}
@@ -384,13 +309,6 @@ export default function App() {
               ) : null
             }
           />
-
-          <View style={styles.resultBox}>
-            <Text style={styles.resultTitle}>Last result</Text>
-            <Text style={styles.resultText} numberOfLines={6}>
-              {lastResult ? String(lastResult) : "No results yet."}
-            </Text>
-          </View>
         </View>
       </SafeAreaView>
       <StatusBar style="light" />
@@ -488,14 +406,4 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 99, 71, 0.35)",
   },
   resetBtnText: { color: "#FF9A8A", fontSize: 12, fontWeight: "700" },
-  resultBox: {
-    marginTop: 10,
-    borderRadius: 12,
-    padding: 10,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-  },
-  resultTitle: { color: "white", fontWeight: "700", marginBottom: 4 },
-  resultText: { color: "#CFCFCF", fontSize: 12 },
 });
