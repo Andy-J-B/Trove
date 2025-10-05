@@ -171,7 +171,8 @@ Transcript:
 "${transcript}"
     `;
 
-    const result = await model.generateContent(prompt);
+    // const result = await model.generateContent(prompt);
+    return "DONEOWNDWANLKDNALK";
     const text = result.response.text();
 
     // Try to parse JSON

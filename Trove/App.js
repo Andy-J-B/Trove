@@ -71,18 +71,8 @@ export default function App() {
     const urls = await drain();
     for (const url of urls) {
       try {
-        const { data: transcript } = await axios.post(
-          "https://YOUR_TRANSCRIPT_API/parse",
-          { url }
-        );
-        const { data: summary } = await axios.post(
-          "https://YOUR_BACKEND/gemini",
-          { transcript }
-        );
-        await axios.post("https://YOUR_BACKEND/content", {
+        await axios.post("http://localhost:3000/extract-products", {
           url,
-          transcript,
-          summary,
         });
       } catch (e) {
         await enqueue(url); // re-queue on failure
