@@ -22,7 +22,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.andybae.trove",
-      "usesCleartextTraffic": false
+      "usesCleartextTraffic": true
     },
     "web": {
       "output": "static",
