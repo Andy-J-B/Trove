@@ -62,7 +62,9 @@ const modernFontBold = Platform.select({
 export default function App() {
   const renderItem = ({ item }: { item: Tile }) => (
     <Pressable
-      onPress={() => router.push(`/category/${encodeURIComponent(item.label.toLowerCase())}`)}
+      onPress={() =>
+        router.push(`/category/${encodeURIComponent(item.label.toLowerCase())}`)
+      }
       style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
     >
       <View style={styles.card}>
@@ -191,3 +193,11 @@ const styles = StyleSheet.create({
     fontFamily: modernFontBold,
   },
 });
+
+// // app/(tabs)/index.tsx
+// import React from "react";
+// import App from "../../App"; // adjust the path if App.js is elsewhere
+
+// export default function HomeScreen() {
+//   return <App />;
+// }
