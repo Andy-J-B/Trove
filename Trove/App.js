@@ -25,6 +25,7 @@ import Constants from "expo-constants";
 // import { SERVER_URL as ENV_SERVER_URL } from "@env";
 
 import { enqueue, drain, peekAll, clearQueue } from "./src/queue";
+import PickaxeLoadingScreen from "./components/PickaxeLoadingScreen";
 
 // ---------- CONFIG ----------
 // For the extract-products route you already had:
@@ -84,6 +85,9 @@ export default function App() {
   const [results, setResults] = useState([]); // [{id, url, result}]
   const lastResult = results[0]?.result || "";
   const [mode, setMode] = useState("unknown"); // "unknown" | "share" | "normal"
+
+  // Loading state - only show when actually loading something
+  const [isLoading, setIsLoading] = useState(false);
 
   // categories state
   const [categories, setCategories] = useState([]); // [{ id?, name }]
@@ -152,6 +156,7 @@ export default function App() {
     const url = `${base}/categories`;
     setCatLoading(true);
     setCatError("");
+    setIsLoading(true); // Show loading screen while fetching
     try {
       const res = await axios.get(url, { timeout: 10000 });
       const payload = res?.data;
@@ -179,8 +184,18 @@ export default function App() {
       );
     } finally {
       setCatLoading(false);
+      setIsLoading(false); // Hide loading screen when done
     }
   }, []);
+
+  // Show loading when categories are being fetched initially
+  useEffect(() => {
+    if (mode === "normal" && categories.length === 0 && !catError) {
+      setIsLoading(true);
+    } else {
+      setIsLoading(false);
+    }
+  }, [mode, categories.length, catError]);
 
   // Decide mode (share vs normal) once useShareIntent resolves
   useEffect(() => {
@@ -229,7 +244,7 @@ export default function App() {
           console.log("🧺 Enqueued:", url);
           try {
             ToastAndroid.show("Saved to Trove", ToastAndroid.SHORT);
-          } catch {}
+          } catch { }
           peekAll().then((q) => setQueued(q.length));
         } else {
           console.log("ℹ️ Share payload had no URL");
@@ -290,6 +305,11 @@ export default function App() {
     if (mode !== "normal") return;
     peekAll().then((q) => setQueued(q.length));
   }, [mode]);
+
+  // Show loading screen
+  if (isLoading) {
+    return <PickaxeLoadingScreen />;
+  }
 
   // If launched via share, render almost nothing so exit is instant
   if (Platform.OS === "android" && mode === "share") {
