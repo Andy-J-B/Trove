@@ -1,5 +1,5 @@
 // App.js
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import {
   SafeAreaView,
   View,
@@ -23,10 +23,12 @@ import { useShareIntent } from "expo-share-intent";
 import { enqueue, drain, peekAll, clearQueue } from "./src/queue";
 
 // ---------- CONFIG ----------
-// For USB + `adb reverse tcp:3000 tcp:3000`, 127.0.0.1 is safest.
-const BASE_URL = "http://127.0.0.1:3000";
+// Use adb reverse for dev on Android USB: adb reverse tcp:3000 tcp:3000
+// Then localhost:3000 from the device maps to your laptop.
+const BASE_URL = "http://localhost:3000";
 // ----------------------------
 
+// 🔊 always log on startup
 console.log("🔥 App.js loaded");
 
 const TILE_LABELS = [
@@ -67,41 +69,40 @@ export default function App() {
 
   const [queued, setQueued] = useState(0);
   const [results, setResults] = useState([]); // [{id, url, result}]
+  const [handledShare, setHandledShare] = useState(false);
   const lastResult = results[0]?.result || "";
-  const [mode, setMode] = useState("unknown"); // "unknown" | "share" | "normal"
 
-  // Prevent double-handling a single share launch
-  const shareHandledRef = useRef(false);
-
-  // ---- helpers ----
-  const ping = useCallback(async () => {
-    try {
-      const r = await axios.get(`${BASE_URL}/health`, { timeout: 5000 });
-      console.log("🌐 Health OK:", r.status, r.data);
-      return true;
-    } catch (e) {
-      console.warn("🌐 Health FAIL:", e?.message);
-      return false;
-    }
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await axios.get(`${BASE_URL}/health`, { timeout: 5000 });
+        console.log("HEALTH OK:", r.data);
+      } catch (e) {
+        console.log(
+          "HEALTH FAIL:",
+          e.message,
+          e.response?.status,
+          e.response?.data
+        );
+      }
+    })();
   }, []);
 
-  const processQueue = useCallback(async () => {
-    const ok = await ping();
-    if (!ok) {
-      console.warn("🚫 Backend not reachable; will retry later");
-      return;
-    }
+  // ---------- helpers ----------
 
+  const processQueue = useCallback(async () => {
     const urls = await drain();
     console.log("🧹 Drain:", urls);
 
     for (const url of urls) {
       try {
+        // ✅ send the correct body key
         const res = await axios.post(
           `${BASE_URL}/extract-products`,
           { tiktokUrl: url },
           { timeout: 15000 }
         );
+
         const text =
           typeof res.data === "string" ? res.data : JSON.stringify(res.data);
         console.log("✅ API OK:", text);
@@ -116,9 +117,7 @@ export default function App() {
         break; // avoid tight loop if network is down
       }
     }
-
-    peekAll().then((q) => setQueued(q.length));
-  }, [ping]);
+  }, []);
 
   const handleResetQueuePress = useCallback(async () => {
     await clearQueue();
@@ -126,79 +125,88 @@ export default function App() {
     setQueued(0);
   }, []);
 
-  // Decide mode (share vs normal) once useShareIntent resolves
+  // ---------- Android share → enqueue fast → exit back to TikTok ----------
   useEffect(() => {
-    if (Platform.OS !== "android") {
-      setMode("normal");
-      return;
-    }
-    if (hasShareIntent && shareIntent) setMode("share");
-    else if (hasShareIntent === false) setMode("normal");
-  }, [hasShareIntent, shareIntent]);
+    if (Platform.OS !== "android") return; // ignore iOS
+    if (!hasShareIntent || !shareIntent || handledShare) return;
 
-  // --- SHARE MODE: enqueue + exit back to TikTok (NO draining)
-  useEffect(() => {
-    if (Platform.OS !== "android") return;
-    if (mode !== "share") return;
-    if (shareHandledRef.current) return;
-
-    shareHandledRef.current = true;
+    let didHandle = false;
     (async () => {
-      try {
-        const url = shareIntent?.webUrl || shareIntent?.text || "";
-        console.log("📩 Share received, URL:", url);
+      console.log("📩 Android share received");
+      setHandledShare(true);
+      didHandle = true;
 
-        if (url) {
+      const url = shareIntent.webUrl || shareIntent.text || "";
+      console.log("🔗 Shared URL:", url);
+
+      if (url) {
+        try {
           await enqueue(url);
           console.log("🧺 Enqueued:", url);
           try {
             ToastAndroid.show("Saved to Trove", ToastAndroid.SHORT);
           } catch {}
           peekAll().then((q) => setQueued(q.length));
-        } else {
-          console.log("ℹ️ Share payload had no URL");
+        } catch (e) {
+          console.warn("❌ Enqueue failed:", e);
+          setHandledShare(false); // let UI open so you can debug
+          return;
         }
-
-        resetShareIntent();
-        setTimeout(() => BackHandler.exitApp(), 200); // bounce back to TikTok
-      } catch (e) {
-        console.warn("❌ Share enqueue failed:", e);
-        // Don't exit; let UI load so you can debug
+      } else {
+        console.log("ℹ️ No URL found in share payload");
       }
-    })();
-  }, [mode, shareIntent, resetShareIntent]);
 
-  // --- NORMAL MODE: process queue on foreground + once on open
+      resetShareIntent();
+      // Give logs/toast a moment to flush, then bounce back to TikTok
+      setTimeout(() => {
+        console.log("👋 Exiting back to TikTok");
+        BackHandler.exitApp();
+      }, 250);
+    })();
+
+    return () => {
+      if (!didHandle) setHandledShare(false);
+    };
+  }, [hasShareIntent, shareIntent, handledShare, resetShareIntent]);
+
+  // ---------- Normal opens (Android): process queue on active ----------
   useEffect(() => {
     if (Platform.OS !== "android") return;
-    if (mode !== "normal") return;
+    if (handledShare) return;
 
     const sub = AppState.addEventListener("change", async (state) => {
+      console.log("📱 AppState:", state);
       if (state === "active") {
         await processQueue();
+        peekAll().then((q) => setQueued(q.length));
       }
     });
 
     (async () => {
+      console.log("🚀 Startup: processing queue once");
       await processQueue();
+      peekAll().then((q) => setQueued(q.length));
     })();
 
     return () => sub.remove();
-  }, [mode, processQueue]);
+  }, [handledShare, processQueue]);
 
-  // Initial queue size (normal launches only)
+  // ---------- Initial queue count ----------
   useEffect(() => {
     if (Platform.OS !== "android") return;
-    if (mode !== "normal") return;
-    peekAll().then((q) => setQueued(q.length));
-  }, [mode]);
+    if (handledShare) return;
+    peekAll().then((q) => {
+      console.log("🔢 Initial queue size:", q.length);
+      setQueued(q.length);
+    });
+  }, [handledShare]);
 
-  // If launched via share, render almost nothing so exit is instant
-  if (Platform.OS === "android" && mode === "share") {
+  // If we were launched via share and haven’t finished handling, render nothing (so Activity can close quickly)
+  if (Platform.OS === "android" && hasShareIntent && !handledShare) {
     return <View style={{ flex: 1, backgroundColor: "transparent" }} />;
   }
 
-  // ---- UI ----
+  // ---------- UI: your modern gradient + grid ----------
   const renderItem = ({ item }) => (
     <Pressable
       onPress={() =>
@@ -224,6 +232,7 @@ export default function App() {
     >
       <SafeAreaView style={styles.safe}>
         <View style={styles.topBar}>
+          {/* Small status strip (keeps you informed without clutter) */}
           <View style={styles.statusPill}>
             <Text style={styles.statusText}>Queued: {queued}</Text>
             {!!error && (
@@ -233,25 +242,16 @@ export default function App() {
             )}
           </View>
 
-          <View style={{ flexDirection: "row", gap: 8 }}>
-            <Pressable
-              onPress={async () => {
-                await processQueue();
-              }}
-              style={styles.resetBtn}
-            >
-              <Text style={styles.resetBtnText}>Process Now</Text>
-            </Pressable>
-
-            <Pressable onPress={handleResetQueuePress} style={styles.resetBtn}>
-              <Text style={styles.resetBtnText}>Reset Queue</Text>
-            </Pressable>
-          </View>
+          <Pressable onPress={handleResetQueuePress} style={styles.resetBtn}>
+            <Text style={styles.resetBtnText}>Reset Queue</Text>
+          </Pressable>
         </View>
 
         <View style={styles.content}>
+          {/* Top: Centered logo area */}
           <View style={styles.logoWrap}>
             <View style={styles.logoRow}>
+              {/* Update path if needed */}
               <Image
                 source={require("./assets/images/logo.png")}
                 style={styles.logoImage}
@@ -261,6 +261,7 @@ export default function App() {
             </View>
           </View>
 
+          {/* Grid of 6 glass tiles */}
           <FlatList
             data={TILES}
             renderItem={renderItem}
@@ -272,6 +273,7 @@ export default function App() {
             showsVerticalScrollIndicator={false}
           />
 
+          {/* Last API response snippet (handy while testing; keeps console logs too) */}
           <View style={styles.resultBox}>
             <Text style={styles.resultTitle}>Last result</Text>
             <Text style={styles.resultText} numberOfLines={6}>
@@ -353,6 +355,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingTop: 8,
+    marginTop: 20,
   },
   statusPill: {
     flexDirection: "row",
