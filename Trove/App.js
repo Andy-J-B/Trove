@@ -135,6 +135,25 @@ export default function App() {
     if (hasShareIntent && shareIntent) setMode("share");
     else if (hasShareIntent === false) setMode("normal");
   }, [hasShareIntent, shareIntent]);
+  // App.js (add near your share-handling effect)
+  useEffect(() => {
+    async function disableKeepAwakeIfSharing() {
+      if (!__DEV__) return;
+      if (Platform.OS !== "android") return;
+      if (!hasShareIntent || !shareIntent) return;
+      try {
+        const { deactivateKeepAwake } = await import("expo-keep-awake");
+        await deactivateKeepAwake(); // prevent the dev client from trying to keep screen on
+        console.log("KeepAwake deactivated for share launch");
+      } catch (e) {
+        console.log(
+          "KeepAwake deactivate failed (safe to ignore):",
+          e?.message || e
+        );
+      }
+    }
+    disableKeepAwakeIfSharing();
+  }, [hasShareIntent, shareIntent]);
 
   // --- SHARE MODE: enqueue + exit back to TikTok (NO draining)
   useEffect(() => {
