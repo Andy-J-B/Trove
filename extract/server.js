@@ -53,13 +53,13 @@ app.get("/api/categories/:id", async (req, res) => {
 
 app.post("/api/categories", async (req, res) => {
   try {
-    const { name, description } = req.body;
+    const { name, description, icon } = req.body;
     if (!name || !description) {
       return res
         .status(400)
         .json({ success: false, error: "Name and Description is required" });
     }
-    const category = await db.createCategory(name, description);
+    const category = await db.createCategory(name, description, icon);
     res.status(201).json({ success: true, data: category });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
@@ -353,6 +353,7 @@ Return ONLY a valid JSON array of products with this structure:
     "name": "Product name",
     "category": "one of: ${namesString}",
     "description": "Brief description based on context",
+    "icon": "An icon of choice that fits the category",
     "mentioned_context": "How it was mentioned in the video"
   }
 ]
@@ -382,6 +383,7 @@ Transcript:
           name: "Raw Response",
           category: "skincare",
           description: text,
+          icon: "icon",
           mentioned_context: "Gemini response could not be parsed as JSON",
         },
       ];
