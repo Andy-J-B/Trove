@@ -3,6 +3,7 @@ import cors from "cors";
 import axios from "axios";
 import dotenv from "dotenv";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import ProductDatabase from "./database.js";
 
 dotenv.config();
 const app = express();
@@ -10,6 +11,10 @@ const PORT = process.env.PORT || 3000;
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+// Initialize database
+const db = new ProductDatabase();
+await db.init();
 
 app.use(cors());
 app.use(express.json());
@@ -20,6 +25,140 @@ app.get("/health", (req, res) => {
     status: "OK",
     message: "TikTok Product Extractor API is running",
   });
+});
+
+// CATEGORIES CRUD ENDPOINTS
+app.get("/api/categories", async (req, res) => {
+  try {
+    const categories = await db.getAllCategories();
+    res.json({ success: true, data: categories });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get("/api/categories/:id", async (req, res) => {
+  try {
+    const category = await db.getCategoryById(req.params.id);
+    if (!category) {
+      return res.status(404).json({ success: false, error: "Category not found" });
+    }
+    res.json({ success: true, data: category });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/api/categories", async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name) {
+      return res.status(400).json({ success: false, error: "Name is required" });
+    }
+    const category = await db.createCategory(name);
+    res.status(201).json({ success: true, data: category });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+app.put("/api/categories/:id", async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name) {
+      return res.status(400).json({ success: false, error: "Name is required" });
+    }
+    const category = await db.updateCategory(req.params.id, name);
+    res.json({ success: true, data: category });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+app.delete("/api/categories/:id", async (req, res) => {
+  try {
+    await db.deleteCategory(req.params.id);
+    res.json({ success: true, message: "Category deleted" });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// PRODUCTS CRUD ENDPOINTS
+app.get("/api/products", async (req, res) => {
+  try {
+    const { category } = req.query;
+    let products;
+
+    if (category) {
+      products = await db.getProductsByCategory(category);
+    } else {
+      products = await db.getAllProducts();
+    }
+
+    res.json({ success: true, data: products });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get("/api/products/:id", async (req, res) => {
+  try {
+    const product = await db.getProductById(req.params.id);
+    if (!product) {
+      return res.status(404).json({ success: false, error: "Product not found" });
+    }
+    res.json({ success: true, data: product });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/api/products", async (req, res) => {
+  try {
+    const productData = req.body;
+    const { name, category } = productData;
+
+    if (!name || !category) {
+      return res.status(400).json({
+        success: false,
+        error: "Name and category are required"
+      });
+    }
+
+    const product = await db.createProduct(productData);
+    res.status(201).json({ success: true, data: product });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+app.put("/api/products/:id", async (req, res) => {
+  try {
+    const product = await db.updateProduct(req.params.id, req.body);
+    res.json({ success: true, data: product });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+app.delete("/api/products/:id", async (req, res) => {
+  try {
+    await db.deleteProduct(req.params.id);
+    res.json({ success: true, message: "Product deleted" });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// STATS ENDPOINT
+app.get("/api/stats", async (req, res) => {
+  try {
+    const stats = await db.getProductStats();
+    res.json({ success: true, data: stats });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // Test endpoint to debug Scrape Creators API
@@ -68,15 +207,31 @@ app.post("/extract-products", async (req, res) => {
         .json({ error: "Could not extract transcript from video" });
     }
 
-    // Step 2: Extract products using OpenAI
+    // Step 2: Extract products using Gemini
     console.log("Extracting products from transcript...");
     const products = await extractProducts(transcript);
+
+    // Step 3: Store products in database
+    const savedProducts = [];
+    for (const product of products) {
+      try {
+        const savedProduct = await db.addProduct({
+          ...product,
+          tiktok_url: tiktokUrl
+        });
+        savedProducts.push(savedProduct);
+      } catch (error) {
+        console.warn(`Failed to save product "${product.name}":`, error.message);
+      }
+    }
 
     res.json({
       success: true,
       tiktokUrl,
       transcript,
       products,
+      savedProducts,
+      savedCount: savedProducts.length
     });
   } catch (error) {
     console.error("Error processing request:", error);
@@ -151,6 +306,19 @@ async function getTranscript(tiktokUrl) {
 
 async function extractProducts(transcript) {
   try {
+    // Parse the transcript JSON if it's a string
+    let transcriptText = transcript;
+    if (typeof transcript === 'string') {
+      try {
+        const parsed = JSON.parse(transcript);
+        if (parsed.utterances) {
+          transcriptText = parsed.utterances.map(u => u.text).join(' ');
+        }
+      } catch (e) {
+        // If it's not JSON, use as is
+      }
+    }
+
     const prompt = `
 You are a product extraction expert. Analyze the given transcript from a TikTok video and extract all products mentioned.
 
@@ -158,32 +326,40 @@ Return ONLY a valid JSON array of products with this structure:
 [
   {
     "name": "Product name",
-    "category": "Product category",
+    "category": "one of: clothing, skincare, haircare, makeup, lebron quotes, faker quotes",
     "description": "Brief description based on context",
     "mentioned_context": "How it was mentioned in the video"
   }
 ]
 
+Categories explained:
+- skincare: cleansers, moisturizers, serums, sunscreen, etc.
+- haircare: shampoos, conditioners, styling products, etc.
+- makeup: foundation, lipstick, mascara, etc.
+- clothing: shirts, pants, shoes, accessories, etc.
+- lebron quotes: any quotes or sayings from LeBron James
+- faker quotes: any quotes or sayings from Faker (League of Legends player)
+
 Only include actual products (physical items, services, brands, apps, etc.) that are clearly mentioned or discussed.
 Do not include generic terms or concepts unless they refer to specific products.
 
 Transcript:
-"${transcript}"
+"${transcriptText}"
     `;
 
-    // const result = await model.generateContent(prompt);
-    return "DONEOWNDWANLKDNALK";
+    const result = await model.generateContent(prompt);
     const text = result.response.text();
 
     // Try to parse JSON
     try {
-      return JSON.parse(text);
+      const cleanText = text.replace(/```json\n?|\n?```/g, '').trim();
+      return JSON.parse(cleanText);
     } catch (err) {
       console.warn("Gemini output was not valid JSON:", text);
       return [
         {
           name: "Raw Response",
-          category: "Unknown",
+          category: "skincare",
           description: text,
           mentioned_context: "Gemini response could not be parsed as JSON",
         },
