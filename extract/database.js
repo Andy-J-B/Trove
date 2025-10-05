@@ -10,26 +10,32 @@ class ProductDatabase {
     this.defaultCategories = [
       {
         name: "clothing",
+        icon: "👕",
         description: "Apparel, footwear, and accessories mentioned in videos",
       },
       {
         name: "skincare",
+        icon: "🧴",
         description: "Products related to skin care routines and treatments",
       },
       {
         name: "haircare",
+        icon: "💈",
         description: "Shampoos, conditioners, styling products, and tools",
       },
       {
         name: "makeup",
+        icon: "💄",
         description: "Cosmetics and beauty products used on the face and eyes",
       },
       {
         name: "lebron quotes",
+        icon: "🏀",
         description: "Memorable LeBron quotes and references",
       },
       {
         name: "faker quotes",
+        icon: "🎮",
         description: "Memorable Faker quotes and references",
       },
     ];
@@ -53,6 +59,7 @@ class ProductDatabase {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT UNIQUE NOT NULL,
         description TEXT NOT NULL,
+        icon TEXT NOT NULL DEFAULT "",
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -223,7 +230,7 @@ class ProductDatabase {
 
   // ----------------- Categories API (updated) -----------------
 
-  async createCategory(name, description) {
+  async createCategory(name, description, icon) {
     if (!name) throw new Error("Category name is required");
     if (!description) throw new Error("Category description is required");
     const result = await this.db.run(
