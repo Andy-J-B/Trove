@@ -1,6 +1,6 @@
 # TikTok Product Extractor API
 
-A lean MVP API that extracts product information from TikTok videos by getting transcripts and analyzing them with AI.
+A lean MVP API that extracts products from TikTok videos by getting transcripts and using OpenAI to identify mentioned products.
 
 ## Setup
 
@@ -9,28 +9,35 @@ A lean MVP API that extracts product information from TikTok videos by getting t
 npm install
 ```
 
-2. Copy environment variables:
+2. Create `.env` file with your API keys:
 ```bash
 cp .env.example .env
 ```
 
 3. Add your API keys to `.env`:
-   - `SCRAPE_CREATORS_API_KEY`: Your Scrape Creators API key
-   - `GEMINI_API_KEY`: Your Google Gemini API key
+- `OPENAI_API_KEY`: Your OpenAI API key
+- `SCRAPE_CREATORS_API_KEY`: Your Scrape Creators API key
+- `PORT`: Server port (default: 3000)
 
 4. Start the server:
 ```bash
+npm start
+# or for development
 npm run dev
 ```
 
 ## API Endpoints
 
-### POST /extract-products
+### Health Check
+```
+GET /health
+```
 
-Extract products from a TikTok video URL.
+### Extract Products
+```
+POST /extract-products
+Content-Type: application/json
 
-**Request:**
-```json
 {
   "tiktokUrl": "https://www.tiktok.com/@username/video/1234567890"
 }
@@ -45,17 +52,13 @@ Extract products from a TikTok video URL.
   "products": [
     {
       "name": "Product Name",
-      "description": "Brief description",
-      "category": "beauty",
-      "details": "Specific details mentioned"
+      "category": "Category",
+      "description": "Product description",
+      "mentioned_context": "How it was mentioned"
     }
   ]
 }
 ```
-
-### GET /health
-
-Health check endpoint.
 
 ## Usage Example
 
