@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import SplashScreenComponent from './splash-screen';
@@ -18,8 +18,7 @@ export default function AppWithSplash({ children }: AppWithSplashProps) {
     async function prepare() {
       try {
         // Pre-load fonts, make any API calls you need to do here
-        // Keep this minimal to avoid delays
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise(resolve => setTimeout(resolve, 100));
       } catch (e) {
         console.warn(e);
       } finally {
@@ -31,21 +30,19 @@ export default function AppWithSplash({ children }: AppWithSplashProps) {
     prepare();
   }, []);
 
-  const handleSplashComplete = () => {
+  const handleSplashComplete = useCallback(async () => {
+    // Hide native splash when our animation completes
+    await SplashScreen.hideAsync();
     setIsShowingSplash(false);
-  };
+  }, []);
 
-  // Show custom splash screen immediately when app is ready
-  if (!appIsReady || isShowingSplash) {
+  // Always show custom splash screen over everything
+  if (isShowingSplash) {
     return (
       <View style={{ flex: 1, backgroundColor: '#000000' }}>
         {appIsReady && (
           <SplashScreenComponent 
             onAnimationComplete={handleSplashComplete}
-            onStart={() => {
-              // Hide native splash screen when custom animation starts
-              SplashScreen.hideAsync();
-            }}
           />
         )}
       </View>
