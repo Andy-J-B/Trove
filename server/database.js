@@ -28,16 +28,6 @@ class ProductDatabase {
         icon: "💄",
         description: "Cosmetics and beauty products used on the face and eyes",
       },
-      {
-        name: "lebron quotes",
-        icon: "🏀",
-        description: "Memorable LeBron quotes and references",
-      },
-      {
-        name: "faker quotes",
-        icon: "🎮",
-        description: "Memorable Faker quotes and references",
-      },
     ];
   }
 
