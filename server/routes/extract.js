@@ -13,10 +13,11 @@ router.post("/", async (req, res, next) => {
 
     const transcript = await getTranscript(tiktokUrl);
     const extracted = await extractProducts(transcript, db);
+    console.log(extracted);
 
     const saved = [];
     for (const p of extracted) {
-      const result = await db.products.create({
+      const result = await db.products.add({
         ...p,
         tiktok_url: tiktokUrl,
       });

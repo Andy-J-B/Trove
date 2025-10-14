@@ -30,8 +30,8 @@ router.get("/:id", async (req, res, next) => {
 
 router.post("/", async (req, res, next) => {
   try {
-    const { name, category } = req.body;
-    if (!name || !category)
+    const { name, category, tiktok_url } = req.body;
+    if (!name || !category || !tiktok_url)
       return res
         .status(400)
         .json({ success: false, error: "Name and Category required" });

@@ -4,7 +4,6 @@ import dotenv from "dotenv";
 import helmet from "helmet";
 import morgan from "morgan";
 
-import db from "./db/index.js";
 import categoryRoutes from "./routes/categories.js";
 import productRoutes from "./routes/products.js";
 import extractRoutes from "./routes/extract.js";

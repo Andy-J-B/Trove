@@ -11,12 +11,14 @@ import {
 } from "react-native";
 import { useLocalSearchParams, Stack, router } from "expo-router";
 import Constants from "expo-constants";
+import { Linking } from "react-native";
 
 type Product = {
   id: string | number;
   name?: string;
   title?: string;
   description?: string;
+  tiktok_url?: string;
 };
 
 function titleCase(s: string) {
@@ -105,12 +107,29 @@ export default function CategoryScreen() {
     ]);
   }
 
+  async function handleOpenLink(url?: string) {
+    if (!url) {
+      Alert.alert(
+        "No link available",
+        "This item doesn't have a valid TikTok URL."
+      );
+      return;
+    }
+
+    try {
+      // Just open the URL directly — TikTok short links will redirect properly
+      await Linking.openURL(url);
+    } catch (err) {
+      console.error("Error opening TikTok link:", err);
+      Alert.alert("Error", "Failed to open TikTok link.");
+    }
+  }
+
   return (
     <View style={styles.container}>
       <Stack.Screen
         options={{
           title,
-          headerBackTitleVisible: false,
           headerTintColor: "#fff",
           headerStyle: { backgroundColor: "#000" },
           headerTitleStyle: { color: "#fff", fontWeight: "800" },
@@ -147,7 +166,10 @@ export default function CategoryScreen() {
             const displayTitle = item.name || item.title || `#${item.id}`;
             return (
               <View style={styles.cardRow}>
-                <Pressable style={styles.card} onPress={() => {}}>
+                <Pressable
+                  style={styles.card}
+                  onPress={() => handleOpenLink(item.tiktok_url)}
+                >
                   <Text style={styles.cardTitle} numberOfLines={1}>
                     {displayTitle}
                   </Text>
