@@ -110,7 +110,7 @@ export default function App() {
     for (const url of urls) {
       try {
         await axios.post(
-          `${EXTRACT_BASE}/extract-products`,
+          `${SERVER_URL}/extract/`,
           { tiktokUrl: url },
           { timeout: 15000 }
         );
@@ -124,6 +124,7 @@ export default function App() {
 
   const fetchCategories = useCallback(async (signal) => {
     const url = `${SERVER_URL}/categories`;
+
     setCatLoading(true);
     setCatError("");
     try {
@@ -131,6 +132,7 @@ export default function App() {
       console.log(res);
 
       const payload = res?.data;
+
       if (!payload?.success) throw new Error(payload?.error || "Error");
       const data = Array.isArray(payload.data) ? payload.data : [];
 
@@ -139,7 +141,7 @@ export default function App() {
           id: c.id ?? i + 1,
           key: String(c.id ?? i + 1),
           label: c.name,
-          icon: c.icon || "folder", // Feather's clean outline folder
+          icon: "folder",
         }))
       );
     } catch {
@@ -149,7 +151,7 @@ export default function App() {
           id: `fallback-${i + 1}`,
           key: String(i + 1),
           label,
-          icon: "🗂️", // or call autoIconFor(label)
+          icon: "folder",
         }))
       );
     } finally {
@@ -376,6 +378,7 @@ export default function App() {
 
         <View style={styles.cardInner}>
           <Feather name={item.icon} size={40} color="white" />
+
           <Text style={styles.cardLabel}>{item.label}</Text>
         </View>
       </View>
