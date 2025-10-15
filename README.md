@@ -70,6 +70,7 @@ npm install
 GEMINI_API_KEY="SOMETHING"
 
 SCRAPE_CREATORS_API_KEY="SOMETHING"
+
 SERVER_URL="http://127.0.0.1:3000/api/"
 
 6. Run server
