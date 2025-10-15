@@ -5,20 +5,24 @@ Discover and keep the useful things you find online. Trove is a React Native app
 ## Features
 
 ### Animated Splash Screen
+
 - Custom pickaxe‑and‑chest animation on launch
 - Smooth transitions powered by React Native Reanimated
 
 ### Share Intent Integration
+
 - Share TikTok links directly into Trove from other apps
 - Automatic product extraction after a link is received
 - Offline queue so shares are not lost without connectivity
 
 ### Category Management
+
 - Flexible category system with support for subcategories
 - Swipe‑to‑delete and confirmations for item management
 - Sensible fallback categories when the device is offline
 
 ### Modern UI/UX
+
 - Dark theme with a clean, focused layout
 - Subtle animations and haptic feedback
 - Responsive grid for categories and lists
@@ -26,6 +30,7 @@ Discover and keep the useful things you find online. Trove is a React Native app
 ## Getting Started
 
 ### Prerequisites
+
 - Node.js 16+
 - npm or yarn
 - Expo CLI
@@ -33,61 +38,113 @@ Discover and keep the useful things you find online. Trove is a React Native app
 
 ### Installation
 
-1) Clone the repository
+1. Clone the repository
+
 ```bash
 git clone https://github.com/yourusername/trove.git
 cd trove
 ```
 
-2) Install dependencies
+2. Install dependencies
+
 ```bash
 npm install
 ```
 
-3) Environment configuration
-Create (or update) `app.json` and set your backend URL:
-```json
-{
-  "expo": {
-    "extra": {
-      "SERVER_URL": "http://your-backend-url/api"
-    }
-  }
-}
-```
+3. Go to server
 
-4) Start the dev server
 ```bash
-npx expo start
+cd server
 ```
 
-5) Run on a device or simulator
-- Press `i` for iOS Simulator
-- Press `a` for Android Emulator
-- Or scan the QR code with the Expo Go app
+4. Install dependencies
+
+```bash
+npm install
+```
+
+5. Environment configuration
+   Make a folder in server named .env
+   Set up your environment variables in server/.env
+
+GEMINI_API_KEY="SOMETHING"
+SCRAPE_CREATORS_API_KEY="SOMETHING"
+SERVER_URL="http://127.0.0.1:3000/api/"
+
+6. Run server
+
+```bash
+cd extract
+npm run dev
+```
+
+7. Run on android device
+
+Connect your android device
+Set the device to debuggin mode on settings (search how)
+Accept laptop connection
+
+Run this :
+
+```bash
+adb kill-server
+adb start-server
+adb devices         # shows a USB device (no :5555)
+adb reverse tcp:3000 tcp:3000
+adb reverse --list  # confirm mapping
+```
+
+Then go to trove and run :
+
+```bash
+cd trove
+npx expo start --dev-client
+```
+
+In another terminal run :
+
+```bash
+cd trove
+npx expo run:android
+```
+
+So you should have three terminals :
+One running server
+One running --dev-client
+One runnning run:android on every build
 
 ## Project Structure
 
 ```
-Trove/
-├─ app/                     # Expo Router pages
-│  ├─ (tabs)/               # Tab navigation
-│  │  ├─ index.tsx          # Home screen
-│  │  └─ explore.tsx        # Explore screen
-│  ├─ category/             # Category pages
-│  │  └─ [slug].tsx         # Dynamic category screen
-│  └─ _layout.tsx           # Root layout with splash screen
-├─ components/              # Reusable components
-│  ├─ splash-screen.tsx     # Animated splash screen
-│  ├─ app-with-splash.tsx   # Splash screen wrapper
-│  └─ swipeable-list-item.tsx # Swipe‑to‑delete component
-├─ src/                     # Core utilities and data layer
-│  └─ queue.js              # Offline queue management
-├─ assets/                  # Images and static files
-└─ App.js                   # App entry
+.(Trove)
+├── app
+│   └── category
+├── server
+│   ├── db
+│   │   └── repositories
+│   ├── routes
+│   ├── services
+│   └── test
+└── trove
+    ├── app
+    │   ├── (tabs)
+    │   └── category
+    ├── assets
+    │   ├── images
+    │   └── trove
+    ├── components
+    │   └── ui
+    ├── constants
+    ├── hooks
+    ├── screens
+    ├── scripts
+    ├── src
+    └── util
+
 ```
 
 ## Tech Stack
+
 - React Native with Expo
 - Expo Router for navigation
 - React Native Reanimated for animations
@@ -96,46 +153,14 @@ Trove/
 - React hooks for state
 - StyleSheet API with a small theme layer
 
-## Key Components
-
-### Splash Screen Animation
-A custom pickaxe hits a treasure chest on launch. Implemented with Reanimated for consistent, jank‑free motion.
-
-### Swipe‑to‑Delete Lists
-Fast, predictable swipe interactions with confirmations and smooth transitions.
-
-### Share Intent Handler (Android)
-Receive TikTok links from other apps and send them to extraction. Links are queued if you are offline.
-
-### Offline Queue
-Incoming shares are stored locally and processed when connectivity returns. Nothing gets lost.
-
-## Configuration
-
-### Backend Endpoints
-Trove talks to a backend for:
-- Category management: `/categories`
-- Product extraction: `/extract-products`
-- Item CRUD: `/products`
-
-### Environment
-Set your API base in `app.json`:
-```json
-{
-  "expo": {
-    "extra": {
-      "SERVER_URL": "https://your-api-domain.com/api"
-    }
-  }
-}
-```
-
 ## Platform Support
+
 - iOS: fully supported
 - Android: fully supported (includes Share Intent)
 - Web: limited support (no native share intent)
 
 ## Usage
+
 1. Launch the app to see the animated splash.
 2. Browse categories; tap a tile to open.
 3. Share a TikTok link from another app to Trove.
@@ -143,6 +168,7 @@ Set your API base in `app.json`:
 5. Pull to refresh to fetch any updates from the server.
 
 ## Contributing
+
 1. Fork the repo
 2. Create a feature branch: `git checkout -b feature/my-feature`
 3. Commit: `git commit -m "Add my feature"`
@@ -150,9 +176,11 @@ Set your API base in `app.json`:
 5. Open a pull request
 
 ## License
+
 MIT. See [LICENSE](LICENSE) for details.
 
 ## Acknowledgments
+
 - Built with Expo
 - Animation and iconography inspired by classic treasure‑hunt UI motifs
 - Layout and interaction patterns follow common mobile design guidelines
