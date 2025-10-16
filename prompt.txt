@@ -1,0 +1,16 @@
+*** Here is the context of my application :
+Trove is a React Native app (built with Expo) that lets you send TikTok links to the app, 
+extract products, and organize everything into categories you control. 
+It’s designed to be fast, offline-friendly, and simple to use.
+The backend is node, with sqlite database. Frontend is typescript react native.
+When user clicks share on tiktok video to our app, it saves the url to our queue, redirects the user back to tiktok.
+When user opens our app again (and for longer, not just to save to queue), then our app pops from queue and sends url to our backend server
+to a transcript api, then to gemini to categorize the products. Then saves to our sqlite db.
+
+*** Here is your role : 
+
+*** Here are the tasks you need to complete :
+
+*** Here is the output I expect :
+
+*** Ask me questions along the way

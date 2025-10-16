@@ -4,11 +4,6 @@ Discover and keep the useful things you find online. Trove is a React Native app
 
 ## Features
 
-### Animated Splash Screen
-
-- Custom pickaxe‑and‑chest animation on launch
-- Smooth transitions powered by React Native Reanimated
-
 ### Share Intent Integration
 
 - Share TikTok links directly into Trove from other apps
