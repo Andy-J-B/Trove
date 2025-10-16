@@ -1,210 +1,197 @@
-import React, { useEffect, useRef, useState } from "react";
-import {
-  SafeAreaView,
-  View,
-  Text,
-  FlatList,
-  RefreshControl,
-  AppState,
-  Platform,
-  ToastAndroid,
-  BackHandler,
-  Image,
-  AppStateStatus,
-} from "react-native";
+import React, { useEffect, useState, useCallback, useRef } from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import { useShareIntent } from "expo-share-intent";
-import { enqueue } from "@/src/queue";
-import { useCategories, Category } from "../hooks/use-categories";
+import axios from "axios";
+import Constants from "expo-constants";
+import { enqueue } from "../src/queue";
+import { HomeHeader } from "../components/home/HomeHeader";
+import { CategoryGrid } from "../components/home/CategoryGrid";
+import { AddCategoryModal } from "../components/home/AddCategoryModal";
+import { ConfirmDeleteModal } from "../components/home/ConfirmDeleteModal";
+import { AppButton } from "../components/ui/AppButton";
 import { useQueueProcessor } from "../hooks/use-queue-processor";
-import AddCategoryModal from "../components/add-category-modal";
-import DeleteConfirmModal from "../components/delete-confirm-modal";
-import FloatingAddButton from "../components/floating-add-button";
-import { BOTTOM_SPACER } from "../util/config";
-import CategoryCard from "@/components/category-card";
+import { BackHandler, Platform } from "react-native";
 
-type Mode = "unknown" | "normal" | "share";
+const EXTRACT_BASE = "http://127.0.0.1:3000";
+const SERVER_URL =
+  (Constants?.expoConfig?.extra &&
+    (Constants.expoConfig.extra as Record<string, string>).SERVER_URL) ||
+  "http://127.0.0.1:3000/api";
 
 export default function HomeScreen() {
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
-  const { categories, loading, error, fetchCategories } = useCategories();
   const { processQueue } = useQueueProcessor();
-  const [addName, setAddName] = useState<string>("");
-  const [addDesc, setAddDesc] = useState<string>("");
-  const [addBusy, setAddBusy] = useState<boolean>(false);
 
-  const [addOpen, setAddOpen] = useState<boolean>(false);
-  const [confirmOpen, setConfirmOpen] = useState<boolean>(false);
-  const [pendingDelete, setPendingDelete] = useState<Category | null>(null);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [catLoading, setCatLoading] = useState(false);
+  const [catError, setCatError] = useState("");
 
-  const shareHandledRef = useRef<boolean>(false);
-  const queueTimerRef = useRef<number | null>(null);
-  const [deleteBusy, setDeleteBusy] = useState<boolean>(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addName, setAddName] = useState("");
+  const [addDesc, setAddDesc] = useState("");
+  const [addBusy, setAddBusy] = useState(false);
 
-  const [mode, setMode] = useState<Mode>("unknown");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<any>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
-  // handle share mode
-  useEffect(() => {
-    if (Platform.OS !== "android") setMode("normal");
-    else if (hasShareIntent && shareIntent) setMode("share");
-    else if (hasShareIntent === false) setMode("normal");
-  }, [hasShareIntent, shareIntent]);
+  const queueTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // share: enqueue URL
-  useEffect(() => {
-    if (
-      Platform.OS !== "android" ||
-      mode !== "share" ||
-      shareHandledRef.current
-    )
-      return;
-
-    shareHandledRef.current = true;
-    (async () => {
-      const url = shareIntent?.webUrl || shareIntent?.text || "";
-      if (url) {
-        await enqueue(url);
-        ToastAndroid.show("Saved to Trove", ToastAndroid.SHORT);
-      }
-      resetShareIntent();
-      setTimeout(() => BackHandler.exitApp(), 200);
-    })();
-  }, [mode, shareIntent, resetShareIntent]);
-
-  // main refresh
-  useEffect(() => {
-    if (Platform.OS !== "android" || mode !== "normal") return;
-
-    function onActive() {
-      const ac = new AbortController();
-      fetchCategories(ac.signal);
-      queueTimerRef.current = setTimeout(processQueue, 1000);
-      return () => {
-        ac.abort();
-        if (queueTimerRef.current) clearTimeout(queueTimerRef.current);
-      };
+  // 🔹 Fetch categories from backend
+  const fetchCategories = useCallback(async () => {
+    setCatLoading(true);
+    setCatError("");
+    try {
+      const res = await axios.get(`${SERVER_URL}/categories`);
+      const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
+      setCategories(data);
+    } catch (err) {
+      console.error(err);
+      setCatError("Failed to load categories");
+    } finally {
+      setCatLoading(false);
     }
+  }, []);
 
-    let cleanup: (() => void) | null = null;
-    if (AppState.currentState === "active") cleanup = onActive();
+  // 🔹 Handle Add Category
+  const handleAddCategory = useCallback(async () => {
+    if (!addName.trim()) return;
+    setAddBusy(true);
+    try {
+      await axios.post(`${SERVER_URL}/categories`, {
+        name: addName,
+        description: addDesc,
+      });
+      setAddOpen(false);
+      setAddName("");
+      setAddDesc("");
+      await fetchCategories();
+    } catch (err) {
+      console.error("Error adding category:", err);
+    } finally {
+      setAddBusy(false);
+    }
+  }, [addName, addDesc, fetchCategories]);
 
-    const sub = AppState.addEventListener("change", (state: AppStateStatus) => {
-      if (cleanup) cleanup();
-      if (state === "active") cleanup = onActive();
-    });
+  // 🔹 Handle Delete Category
+  const handleDeleteCategory = useCallback(async () => {
+    if (!pendingDelete) return;
+    setDeleteBusy(true);
+    try {
+      await axios.delete(`${SERVER_URL}/categories/${pendingDelete.id}`);
+      setConfirmOpen(false);
+      setPendingDelete(null);
+      await fetchCategories();
+    } catch (err) {
+      console.error("Error deleting category:", err);
+    } finally {
+      setDeleteBusy(false);
+    }
+  }, [pendingDelete, fetchCategories]);
+
+  // 🔹 Handle Share Intent (share to queue)
+  useEffect(() => {
+    const handleShareIntent = async () => {
+      if (hasShareIntent && shareIntent) {
+        const url = shareIntent.webUrl || shareIntent.text || "";
+        console.log("Received share intent URL:", url);
+        if (url) {
+          await enqueue(url);
+          console.log("✅ Enqueued shared URL");
+        }
+        await resetShareIntent();
+
+        // 🔹 Close app automatically after enqueueing
+        if (Platform.OS === "android") {
+          // On Android, BackHandler.exitApp() cleanly exits
+          BackHandler.exitApp();
+        } else {
+          // On iOS, you can’t programmatically close the app
+          // Instead, just silently go to background (no redirect)
+          console.log("📱 iOS: staying idle after enqueue");
+        }
+      }
+    };
+    handleShareIntent();
+  }, [hasShareIntent, shareIntent, resetShareIntent]);
+
+  // 🔹 Start polling queue when in normal mode
+  useEffect(() => {
+    // skip if app was opened via share intent
+    if (hasShareIntent) return;
+
+    // immediately try once, then every 20s
+    processQueue();
+    queueTimerRef.current = setInterval(processQueue, 20000);
 
     return () => {
-      sub.remove();
-      if (cleanup) cleanup();
+      if (queueTimerRef.current) clearInterval(queueTimerRef.current);
     };
-  }, [mode, fetchCategories, processQueue]);
+  }, [hasShareIntent, processQueue]);
 
-  const askDelete = (cat: Category) => {
+  // 🔹 Initial category load
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
+
+  const askDelete = (cat: any) => {
     setPendingDelete(cat);
     setConfirmOpen(true);
   };
 
-  const submitAdd = async () => {
-    setAddBusy(true);
-    try {
-      // Call API to add category here
-      // e.g., await api.post("/categories", { name: addName, desc: addDesc });
-      setAddName("");
-      setAddDesc("");
-      setAddOpen(false);
-      await fetchCategories();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setAddBusy(false);
-    }
-  };
-
-  const confirmDelete = async () => {
-    if (!pendingDelete) return;
-    setDeleteBusy(true);
-    try {
-      // Call API to delete
-      // await api.delete(`/categories/${pendingDelete.id}`);
-      setPendingDelete(null);
-      setConfirmOpen(false);
-      await fetchCategories();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setDeleteBusy(false);
-    }
-  };
-
   return (
-    <LinearGradient colors={["#000", "#070707", "#000"]} style={{ flex: 1 }}>
+    <LinearGradient
+      colors={["#000000", "#070707", "#000000"]}
+      style={{ flex: 1 }}
+    >
       <SafeAreaView style={{ flex: 1, paddingHorizontal: 12 }}>
-        <StatusBar style="light" />
-        <View
+        <HomeHeader />
+
+        <CategoryGrid
+          data={categories}
+          loading={catLoading}
+          error={catError}
+          onRefresh={fetchCategories}
+          onDelete={askDelete}
+        />
+
+        <AppButton
+          title="+"
+          onPress={() => setAddOpen(true)}
           style={{
-            flex: 1,
-            justifyContent: "flex-end",
-            paddingBottom: BOTTOM_SPACER,
+            position: "absolute",
+            bottom: 40,
+            alignSelf: "center",
+            width: 64,
+            height: 64,
+            borderRadius: 32,
           }}
-        >
-          <View style={{ alignItems: "center" }}>
-            <Image
-              source={require("../../assets/images/logo.png")}
-              style={{ width: 64, height: 64 }}
-              resizeMode="contain"
-            />
-            <Text style={{ color: "white", fontSize: 44, fontWeight: "900" }}>
-              TROVE
-            </Text>
-          </View>
-
-          <FlatList
-            data={categories}
-            renderItem={({ item }) => (
-              <CategoryCard item={item} onDelete={askDelete} />
-            )}
-            numColumns={2}
-            keyExtractor={(i) => i.key}
-            refreshControl={
-              <RefreshControl
-                refreshing={loading}
-                onRefresh={() => fetchCategories()}
-                tintColor="#fff"
-              />
-            }
-            ListHeaderComponent={
-              error ? (
-                <Text style={{ color: "#ff8a8a", textAlign: "center" }}>
-                  {error}
-                </Text>
-              ) : null
-            }
-            ListFooterComponent={<View style={{ height: 50 }} />}
-          />
-
-          <FloatingAddButton onPress={() => setAddOpen(true)} />
-
-          <AddCategoryModal
-            visible={addOpen}
-            name={addName}
-            desc={addDesc}
-            onChangeName={setAddName}
-            onChangeDesc={setAddDesc}
-            onSubmit={submitAdd}
-            onClose={() => setAddOpen(false)}
-            busy={addBusy}
-          />
-
-          <DeleteConfirmModal
-            visible={confirmOpen}
-            label={pendingDelete?.label || ""}
-            onCancel={() => setConfirmOpen(false)}
-            onConfirm={confirmDelete}
-            busy={deleteBusy}
-          />
-        </View>
+          textStyle={{ fontWeight: "800", fontSize: 30 }}
+        />
       </SafeAreaView>
+
+      <AddCategoryModal
+        visible={addOpen}
+        name={addName}
+        desc={addDesc}
+        busy={addBusy}
+        onChangeName={setAddName}
+        onChangeDesc={setAddDesc}
+        onSubmit={handleAddCategory}
+        onClose={() => setAddOpen(false)}
+      />
+
+      <ConfirmDeleteModal
+        visible={confirmOpen}
+        category={pendingDelete}
+        busy={deleteBusy}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={handleDeleteCategory}
+      />
+
+      <StatusBar style="light" />
     </LinearGradient>
   );
 }
