@@ -5,7 +5,7 @@ trove-backend/
 │ │ ├─ categories.ts
 │ │ └─ health.ts
 │ ├─ jobs/
-│ │ ├─ processQueue.ts # BullMQ worker (transcript → Gemini)
+│ │ ├─ queueProcessor.ts # BullMQ worker (transcript → Gemini)
 │ │ └─ purgeOldData.ts # daily 30‑day cleanup
 │ ├─ lib/
 │ │ ├─ db.ts # Prisma client + Supabase DSN
