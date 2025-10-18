@@ -30,8 +30,6 @@ export async function flushQueue() {
 
   try {
     for (const { url, deviceId } of items) {
-      console.log("POST");
-      return;
       await fetch(`${SERVER_URL}/queue`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
