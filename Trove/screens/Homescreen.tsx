@@ -43,8 +43,19 @@ export default function HomeScreen() {
   const fetchCategories = useCallback(async () => {
     setCatLoading(true);
     setCatError("");
+
     try {
-      const res = await axios.get(`${SERVER_URL}/categories`);
+      // 1️⃣ Get the device ID from SecureStore / Expo
+      const deviceId = await getDeviceId();
+
+      // 2️⃣ Make the request with x-device-id header
+      const res = await axios.get(`${SERVER_URL}/categories`, {
+        headers: {
+          "x-device-id": deviceId,
+        },
+      });
+
+      // 3️⃣ Normalize response
       const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
       setCategories(data);
     } catch (err) {
@@ -60,10 +71,21 @@ export default function HomeScreen() {
     if (!addName.trim()) return;
     setAddBusy(true);
     try {
-      await axios.post(`${SERVER_URL}/categories`, {
-        name: addName,
-        description: addDesc,
-      });
+      const deviceId = await getDeviceId();
+      console.log(deviceId);
+      await axios.post(
+        `${SERVER_URL}/categories`,
+        {
+          name: addName,
+          description: addDesc,
+        },
+        {
+          headers: {
+            "x-device-id": deviceId,
+          },
+        }
+      );
+
       setAddOpen(false);
       setAddName("");
       setAddDesc("");
@@ -79,8 +101,16 @@ export default function HomeScreen() {
   const handleDeleteCategory = useCallback(async () => {
     if (!pendingDelete) return;
     setDeleteBusy(true);
+
     try {
-      await axios.delete(`${SERVER_URL}/categories/${pendingDelete.id}`);
+      const deviceId = await getDeviceId();
+
+      await axios.delete(`${SERVER_URL}/categories/${pendingDelete.id}`, {
+        headers: {
+          "x-device-id": deviceId,
+        },
+      });
+
       setConfirmOpen(false);
       setPendingDelete(null);
       await fetchCategories();
@@ -146,6 +176,8 @@ export default function HomeScreen() {
     setPendingDelete(cat);
     setConfirmOpen(true);
   };
+
+  console.log(categories);
 
   return (
     <LinearGradient
