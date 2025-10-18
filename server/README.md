@@ -1,22 +1,24 @@
-trove-backend/
-├─ src/
-│ ├─ api/ # Express routes
-│ │ ├─ queue.ts
-│ │ ├─ categories.ts
-│ │ └─ health.ts
-│ ├─ jobs/
-│ │ ├─ queueProcessor.ts # BullMQ worker (transcript → Gemini)
-│ │ └─ purgeOldData.ts # daily 30‑day cleanup
-│ ├─ lib/
-│ │ ├─ db.ts # Prisma client + Supabase DSN
-│ │ └─ redis.ts # BullMQ connection helper
-│ └─ server.ts # Express app bootstrap
-├─ prisma/
-│ └─ schema.prisma # DB schema + migrations
-├─ Dockerfile
-├─ .dockerignore
-├─ package.json
-├─ tsconfig.json
-└─ .github/
-└─ workflows/
-└─ ci.yml # GitHub Actions CI/CD
+.
+├── prisma
+│ ├── migrations
+│ └── schema.prisma
+├── routes
+│ ├── categories.js
+│ ├── extract.js
+│ └── products.js
+├── server.ts
+└── src
+├── api
+│ ├── categories.ts
+│ ├── health.ts
+│ ├── products.ts
+│ └── queue.ts
+├── external
+│ ├── geminiService.ts
+│ └── transcriptService.ts
+├── jobs
+│ ├── purgeOldData.ts
+│ └── queueProcessor.ts
+└── lib
+├── db.ts
+└── redis.ts
