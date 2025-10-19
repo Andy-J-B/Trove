@@ -6,25 +6,21 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-# Copy TypeScript and Prisma schema
+# Copy source files
 COPY src ./src
 COPY prisma ./prisma
+COPY routes ./routes
 COPY server.ts ./
 
-# Generate Prisma client & compile TS
+# Generate Prisma client
 RUN npx prisma generate
-RUN npm run build  # outputs to ./dist
 
-# ---------- Runtime Stage ----------
-FROM node:20-alpine AS runner
-WORKDIR /app
+# Install tsx globally (for running TS directly)
+RUN npm install -g tsx
 
-ENV NODE_ENV=production
+# Expose port and set env
 EXPOSE 3000
+ENV NODE_ENV=production
 
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/src ./src
-COPY --from=builder /app/server.ts ./server.ts
-COPY --from=builder /app/prisma ./prisma
-
-CMD ["node", "server.js"]
+# Run the app directly with tsx
+CMD ["tsx", "server.ts"]
