@@ -1,34 +1,35 @@
-# ---------- Build ----------
+# ---------- Build Stage ----------
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Install dependencies (including dev deps for TS)
+# Install dependencies
 COPY package*.json ./
 RUN npm ci
 
-# Copy source & Prisma schema
+# Copy TypeScript and Prisma schema
 COPY tsconfig.json ./
 COPY src ./src
 COPY prisma ./prisma
 
 # Generate Prisma client & compile TS
 RUN npx prisma generate
-RUN npm run build        # → ./dist
+RUN npm run build  # outputs to ./dist
 
-# ---------- Runtime ----------
-FROM node:20-alpine
+# ---------- Runtime Stage ----------
+FROM node:20-alpine AS runner
 WORKDIR /app
 
-# Copy only compiled output and runtime deps
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/prisma ./prisma
-
-# Delete for prod
-COPY .env.example .env
-
-
-EXPOSE 3000
 ENV NODE_ENV=production
+EXPOSE 3000
 
+# Copy only what’s needed
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/prisma ./prisma
+COPY package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
+
+# Optional: if Prisma uses native engines
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+
+# Use runtime env (pass via --env-file or Docker Compose)
 CMD ["node", "dist/server.js"]
