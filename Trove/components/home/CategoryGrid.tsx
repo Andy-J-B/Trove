@@ -35,7 +35,12 @@ export const CategoryGrid: React.FC<Props> = ({
   const renderItem = ({ item }: { item: Category }) => (
     <Pressable
       onPress={() =>
-        router.push(`/category/${encodeURIComponent(item.name.toLowerCase())}`)
+        router.push({
+          pathname: "/category/[slug]",
+          params: {
+            slug: `${item.id}%CATEGORYPAGE%${encodeURIComponent(item.name.trim())}`, // 👈 both id and name combined
+          },
+        })
       }
       style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
     >

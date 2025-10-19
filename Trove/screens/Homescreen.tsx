@@ -5,7 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { useShareIntent } from "expo-share-intent";
 import axios from "axios";
 import Constants from "expo-constants";
-import { enqueue } from "../src/queue";
+import { enqueue, clearQueue } from "../src/queue";
 import { HomeHeader } from "../components/home/HomeHeader";
 import { CategoryGrid } from "../components/home/CategoryGrid";
 import { AddCategoryModal } from "../components/home/AddCategoryModal";
@@ -13,8 +13,9 @@ import { ConfirmDeleteModal } from "../components/home/ConfirmDeleteModal";
 import { AppButton } from "../components/ui/AppButton";
 import { useQueueProcessor } from "../hooks/use-queue-processor";
 import { BackHandler, Platform } from "react-native";
+import { getDeviceId } from "@/util/device";
+import { Alert } from "react-native";
 
-const EXTRACT_BASE = "http://127.0.0.1:3000";
 const SERVER_URL =
   (Constants?.expoConfig?.extra &&
     (Constants.expoConfig.extra as Record<string, string>).SERVER_URL) ||
@@ -43,8 +44,19 @@ export default function HomeScreen() {
   const fetchCategories = useCallback(async () => {
     setCatLoading(true);
     setCatError("");
+
     try {
-      const res = await axios.get(`${SERVER_URL}/categories`);
+      // 1️⃣ Get the device ID from SecureStore / Expo
+      const deviceId = await getDeviceId();
+
+      // 2️⃣ Make the request with x-device-id header
+      const res = await axios.get(`${SERVER_URL}/categories`, {
+        headers: {
+          "x-device-id": deviceId,
+        },
+      });
+
+      // 3️⃣ Normalize response
       const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
       setCategories(data);
     } catch (err) {
@@ -60,10 +72,21 @@ export default function HomeScreen() {
     if (!addName.trim()) return;
     setAddBusy(true);
     try {
-      await axios.post(`${SERVER_URL}/categories`, {
-        name: addName,
-        description: addDesc,
-      });
+      const deviceId = await getDeviceId();
+
+      await axios.post(
+        `${SERVER_URL}/categories`,
+        {
+          name: addName,
+          description: addDesc,
+        },
+        {
+          headers: {
+            "x-device-id": deviceId,
+          },
+        }
+      );
+
       setAddOpen(false);
       setAddName("");
       setAddDesc("");
@@ -79,8 +102,16 @@ export default function HomeScreen() {
   const handleDeleteCategory = useCallback(async () => {
     if (!pendingDelete) return;
     setDeleteBusy(true);
+
     try {
-      await axios.delete(`${SERVER_URL}/categories/${pendingDelete.id}`);
+      const deviceId = await getDeviceId();
+
+      await axios.delete(`${SERVER_URL}/categories/${pendingDelete.id}`, {
+        headers: {
+          "x-device-id": deviceId,
+        },
+      });
+
       setConfirmOpen(false);
       setPendingDelete(null);
       await fetchCategories();
@@ -98,18 +129,25 @@ export default function HomeScreen() {
         const url = shareIntent.webUrl || shareIntent.text || "";
         console.log("Received share intent URL:", url);
         if (url) {
-          await enqueue(url);
-          console.log("✅ Enqueued shared URL");
+          try {
+            // get or generate persistent unique device ID
+
+            const deviceId = await getDeviceId();
+
+            // enqueue the url with deviceId
+            await enqueue(url, deviceId);
+            console.log("✅ Enqueued shared URL with device ID:", deviceId);
+          } catch (err) {
+            console.error("❌ Failed to enqueue shared URL:", err);
+          }
         }
+
         await resetShareIntent();
 
         // 🔹 Close app automatically after enqueueing
         if (Platform.OS === "android") {
-          // On Android, BackHandler.exitApp() cleanly exits
-          BackHandler.exitApp();
+          BackHandler.exitApp(); // clean exit
         } else {
-          // On iOS, you can’t programmatically close the app
-          // Instead, just silently go to background (no redirect)
           console.log("📱 iOS: staying idle after enqueue");
         }
       }
@@ -119,16 +157,15 @@ export default function HomeScreen() {
 
   // 🔹 Start polling queue when in normal mode
   useEffect(() => {
-    // skip if app was opened via share intent
-    if (hasShareIntent) return;
+    if (hasShareIntent) return; // skip if app was opened via share
 
-    // immediately try once, then every 20s
-    processQueue();
-    queueTimerRef.current = setInterval(processQueue, 20000);
+    // // immediately try once, then every 20s
+    // processQueue();
+    // queueTimerRef.current = setInterval(processQueue, 20000);
 
-    return () => {
-      if (queueTimerRef.current) clearInterval(queueTimerRef.current);
-    };
+    // return () => {
+    //   if (queueTimerRef.current) clearInterval(queueTimerRef.current);
+    // };
   }, [hasShareIntent, processQueue]);
 
   // 🔹 Initial category load

@@ -53,3 +53,14 @@ export interface ConfirmDeleteModalProps {
   onCancel: () => void;
   onConfirm: () => void;
 }
+
+export type ShoppingUrl = {
+  id: string;
+  url: string;
+  createdAt: string; // ISO‑date string
+  price?: string | null;
+  source?: string | null;
+  sourceIcon?: string | null; // URL to the vendor’s logo
+  thumbnail?: string | null; // product image URL
+  delivery?: string | null; // e.g. “Free shipping”
+};
