@@ -15,6 +15,8 @@ import queueRouter from "./src/api/queue";
 import categoriesRouter from "./src/api/categories";
 import productsRouter from "./src/api/products";
 import queueStatusRouter from "./src/api/health.js";
+import shoppingRouter from "./src/api/shopping.js";
+
 import { startQueueProcessor } from "./src/jobs/queueProcessor.js";
 
 dotenv.config();
@@ -42,6 +44,7 @@ app.use("/api/queue", queueRouter);
 app.use("/api/categories", categoriesRouter);
 app.use("/api/products", productsRouter);
 app.use("/api/status", queueStatusRouter); // curl -X GET "http://localhost:3000/api/status/queue-status"
+app.use("/api/shopping", shoppingRouter);
 
 // ✅ Global error handler
 app.use((err: any, _req: Request, res: Response, _next: NextFunction): void => {

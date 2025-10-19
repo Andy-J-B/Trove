@@ -124,50 +124,64 @@ export async function extractProducts(
   // -----------------------------------------------------------------
   const prompt = buildPrompt(transcript, dbCategories);
 
-  // const result = await model.generateContent(prompt);
+  const result = await model.generateContent(prompt);
 
-  // // Gemini returns a `Response` object – we grab the plain text
-  // const rawText = result.response
-  //   .text()
-  //   .replace(/```json\n?|\n?```/g, "") // strip code fences if they appear
-  //   .trim();
+  // Gemini returns a `Response` object – we grab the plain text
+  const rawText = result.response
+    .text()
+    .replace(/```json\n?|\n?```/g, "") // strip code fences if they appear
+    .trim();
 
-  const rawText = [
-    {
-      name: "Joggers",
-      category: "Clothing",
-      description:
-        "Essential trousers made from heavyweight material, available in cuffed or uncuffed styles, often preferred with a straight or wide leg fit.",
-      icon: "👖",
-      mentioned_context:
-        "No. 1 is a solid pair of joggers. You want a heavyweight material that's actually gonna hold up after a few wears, so don't go cheap. Cuffed or uncuffed is down to your own preference. I prefer mine uncuffed with a straight or wide leg fit.",
-    },
-    {
-      name: "Denim Jeans",
-      category: "Clothing",
-      description:
-        "Essential denim trousers available in a variety of fits and washes, recommended to start with light or dark options.",
-      icon: "👖",
-      mentioned_context:
-        "No. 2 is denim. Go for a variety of fits depending on your style. Start with a light or dark wash before going to other colours.",
-    },
-    {
-      name: "Dress Trousers",
-      category: "Clothing",
-      description:
-        "Black or grey trousers that add a polished, smart casual touch to an outfit, often preferred with a straight or wide leg fit.",
-      icon: "👖",
-      mentioned_context:
-        "No. 3 is some black or grey dress trousers. These add a polished, smart casual touch and I love how they flow with an outfit. And again, I prefer a straight or wide leg fit.",
-    },
-  ];
+  // console.log("\n\n\n", rawText, "\n\n\n");
+
+  // const rawText = [
+  //   {
+  //     name: "Uniqlo Pleated Trousers",
+  //     category: "Clothing",
+  //     description:
+  //       "These trousers are highly recommended for every man, known for their amazing fit and true-to-size nature, coming with two drawstrings for perfect sizing.",
+  //     icon: "👖",
+  //     mentioned_context:
+  //       "Uniqlo's pants that every man needs; these are the Uniqlo pleated trousers.",
+  //   },
+  // ];
+
+  // const rawText = [
+  //   {
+  //     name: "Joggers",
+  //     category: "Clothing",
+  //     description:
+  //       "Essential trousers made from heavyweight material, available in cuffed or uncuffed styles, often preferred with a straight or wide leg fit.",
+  //     icon: "👖",
+  //     mentioned_context:
+  //       "No. 1 is a solid pair of joggers. You want a heavyweight material that's actually gonna hold up after a few wears, so don't go cheap. Cuffed or uncuffed is down to your own preference. I prefer mine uncuffed with a straight or wide leg fit.",
+  //   },
+  //   {
+  //     name: "Denim Jeans",
+  //     category: "Clothing",
+  //     description:
+  //       "Essential denim trousers available in a variety of fits and washes, recommended to start with light or dark options.",
+  //     icon: "👖",
+  //     mentioned_context:
+  //       "No. 2 is denim. Go for a variety of fits depending on your style. Start with a light or dark wash before going to other colours.",
+  //   },
+  //   {
+  //     name: "Dress Trousers",
+  //     category: "Clothing",
+  //     description:
+  //       "Black or grey trousers that add a polished, smart casual touch to an outfit, often preferred with a straight or wide leg fit.",
+  //     icon: "👖",
+  //     mentioned_context:
+  //       "No. 3 is some black or grey dress trousers. These add a polished, smart casual touch and I love how they flow with an outfit. And again, I prefer a straight or wide leg fit.",
+  //   },
+  // ];
 
   // -----------------------------------------------------------------
   // Try to parse the JSON.  If parsing fails we warn and return [].
   // -----------------------------------------------------------------
   try {
-    // const parsed = JSON.parse(rawText) as GeminiProduct[];
-    const parsed = rawText as GeminiProduct[];
+    const parsed = JSON.parse(rawText) as GeminiProduct[];
+    // const parsed = rawText as GeminiProduct[];
     // The original service used a flat product list; for the
     // DB‑writer we regroup by category here.
     const byCategory: Record<string, GeminiCategory> = {};

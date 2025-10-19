@@ -1,6 +1,7 @@
 // src/api/categories.ts
 import { Router } from "express";
 import { prisma } from "../lib/db";
+import { ensureDevice } from "../lib/device";
 
 const router = Router();
 
@@ -39,6 +40,9 @@ router.post("/", async (req, res, next) => {
 router.get("/", async (req, res, next) => {
   try {
     const deviceId = getDeviceId(req);
+
+    await ensureDevice(deviceId);
+
     const categories = await prisma.category.findMany({
       where: { deviceId, isDeleted: false },
       orderBy: { name: "asc" },
@@ -84,18 +88,32 @@ router.patch("/:id", async (req, res, next) => {
 });
 
 /* ------------------- DELETE ------------------- */
+// src/api/categories.ts   (replace the old soft‑delete block)
+
 router.delete("/:id", async (req, res, next) => {
   try {
     const deviceId = getDeviceId(req);
-    await prisma.category.updateMany({
-      where: { id: req.params.id, deviceId },
-      data: { isDeleted: true },
+    const categoryId = req.params.id;
+
+    // Verify the category belongs to the device
+    const category = await prisma.category.findFirst({
+      where: {
+        id: categoryId,
+        deviceId,
+        isDeleted: false,
+      },
     });
-    // Soft‑delete cascades – we also mark child products as deleted
-    await prisma.product.updateMany({
-      where: { categoryId: req.params.id },
-      data: { isDeleted: true },
-    });
+
+    if (!category) {
+      return res.status(404).json({ error: "Category not found" });
+    }
+
+    // One call – the cascade will:
+    //   * delete the category
+    //   * delete every product that belongs to it
+    //   * delete every ShoppingUrl that belongs to those products
+    await prisma.category.delete({ where: { id: categoryId } });
+
     res.json({ deleted: true });
   } catch (e) {
     next(e);

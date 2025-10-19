@@ -85,6 +85,40 @@ router.get("/by-category/:categoryId", async (req, res, next) => {
   }
 });
 
+/* ------------------- READ BY PRODUCT ID ------------------- */
+router.get("/:id", async (req, res, next) => {
+  try {
+    const deviceId = getDeviceId(req);
+    const productId = req.params.id;
+
+    const product = await prisma.product.findFirst({
+      where: {
+        id: productId,
+        isDeleted: false,
+        // The product must belong to a category that belongs to this device
+        category: {
+          deviceId,
+          isDeleted: false,
+        },
+      },
+      // Pull the related shopping URLs in one go
+      include: {
+        shoppingUrls: true,
+      },
+      // Not really needed for a single row, but keeps ordering logic uniform
+      orderBy: [{ createdAt: "desc" }],
+    });
+
+    if (!product) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    res.json(product);
+  } catch (e) {
+    next(e);
+  }
+});
+
 /* ------------------- UPDATE ------------------- */
 router.patch("/:id", async (req, res, next) => {
   try {
@@ -124,20 +158,30 @@ router.patch("/:id", async (req, res, next) => {
 });
 
 /* ------------------- DELETE (soft) ------------------- */
+// src/api/products.ts   (replace the old soft‑delete block)
+
 router.delete("/:id", async (req, res, next) => {
   try {
     const deviceId = getDeviceId(req);
-    const deleted = await prisma.product.updateMany({
+    const productId = req.params.id;
+
+    // Verify ownership first – we don’t want to delete someone else’s product.
+    const product = await prisma.product.findFirst({
       where: {
-        id: req.params.id,
-        isDeleted: false,
+        id: productId,
+        isDeleted: false, // ignore already‑deleted rows
         category: { deviceId, isDeleted: false },
       },
-      data: { isDeleted: true },
     });
 
-    if (deleted.count === 0)
-      return res.status(404).json({ error: "Not found" });
+    if (!product) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    // This single call permanently deletes the product **and**
+    // all its ShoppingUrl rows thanks to the cascade we added above.
+    await prisma.product.delete({ where: { id: productId } });
+
     res.json({ deleted: true, success: true });
   } catch (e) {
     next(e);
