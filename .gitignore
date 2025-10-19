@@ -33,6 +33,8 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
+.env.example
 .env*.local
 
 # typescript
@@ -50,3 +52,6 @@ app-example
 
 # /server/prisma
 /trove/expo-env.d.ts
+
+# Kiro files
+.kiro/
