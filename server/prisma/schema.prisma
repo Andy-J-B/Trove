@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/**
+ * Soft‑delete pattern – keep a boolean flag and a createdAt timestamp.
+ * All reads should filter `isDeleted = false`.
+ */
+model Device {
+  id         String      @id @default(uuid()) @map("id")
+  createdAt  DateTime    @default(now()) @map("created_at")
+  isDeleted  Boolean     @default(false) @map("is_deleted")
+  categories Category[]  @relation("DeviceCategories")
+  queueItems QueueItem[] @relation("DeviceQueueItems")
+
+  @@map("device")
+}
+
+model Category {
+  id          String    @id @default(uuid()) @map("id")
+  deviceId    String    @map("device_id")
+  name        String
+  description String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  isDeleted   Boolean   @default(false) @map("is_deleted")
+  device      Device    @relation("DeviceCategories", fields: [deviceId], references: [id])
+  products    Product[] @relation("CategoryProducts") // ✅ remove cascade here
+
+  @@unique([deviceId, name], name: "deviceId_name")
+  @@index([deviceId, isDeleted])
+  @@map("category")
+}
+
+model Product {
+  id               String          @id @default(uuid()) @map("id")
+  categoryId       String          @map("category_id")
+  name             String
+  price            String?
+  tiktokUrl        String          @map("tiktok_url")
+  imageUrl         String?         @map("image_url")
+  description      String?
+  createdAt        DateTime        @default(now()) @map("created_at")
+  isDeleted        Boolean         @default(false) @map("is_deleted")
+  mentionedContent String?         @map("mentioned_content")
+
+  // ✅ The child (foreign key) side gets the cascade rule
+  category     Category      @relation("CategoryProducts", fields: [categoryId], references: [id], onDelete: Cascade)
+  shoppingUrls ShoppingUrl[] @relation("ProductShoppingUrls") // ✅ remove cascade here
+
+  @@index([categoryId, isDeleted])
+  @@map("product")
+}
+
+model ShoppingUrl {
+  id         String   @id @default(uuid()) @map("id")
+  productId  String   @map("product_id")
+  url        String   @map("url")
+  price      String?  @map("price")
+  source     String?  @map("source")
+  sourceIcon String?  @map("source_icon")
+  thumbnail  String?  @map("thumbnail")
+  delivery   String?  @map("delivery")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // ✅ Cascade on the child side
+  product Product @relation("ProductShoppingUrls", fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@map("shopping_url")
+}
+
+/**
+ * Queue items that store the TikTok URL a device has submitted for processing.
+ */
+model QueueItem {
+  id        String      @id @default(uuid())
+  deviceId  String      @map("device_id")
+  url       String      @map("tiktok_url")
+  status    QueueStatus @default(PENDING)
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+  device    Device      @relation("DeviceQueueItems", fields: [deviceId], references: [id])
+
+  @@index([deviceId, status])
+  @@unique([deviceId, url])
+  @@map("queue_item")
+}
+
+enum QueueStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
