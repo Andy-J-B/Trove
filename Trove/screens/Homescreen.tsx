@@ -5,7 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { useShareIntent } from "expo-share-intent";
 import axios from "axios";
 import Constants from "expo-constants";
-import { enqueue } from "../src/queue";
+import { enqueue, clearQueue } from "../src/queue";
 import { HomeHeader } from "../components/home/HomeHeader";
 import { CategoryGrid } from "../components/home/CategoryGrid";
 import { AddCategoryModal } from "../components/home/AddCategoryModal";
@@ -14,6 +14,7 @@ import { AppButton } from "../components/ui/AppButton";
 import { useQueueProcessor } from "../hooks/use-queue-processor";
 import { BackHandler, Platform } from "react-native";
 import { getDeviceId } from "@/util/device";
+import { Alert } from "react-native";
 
 const SERVER_URL =
   (Constants?.expoConfig?.extra &&
@@ -72,7 +73,7 @@ export default function HomeScreen() {
     setAddBusy(true);
     try {
       const deviceId = await getDeviceId();
-      console.log(deviceId);
+
       await axios.post(
         `${SERVER_URL}/categories`,
         {
@@ -158,13 +159,13 @@ export default function HomeScreen() {
   useEffect(() => {
     if (hasShareIntent) return; // skip if app was opened via share
 
-    // immediately try once, then every 20s
-    processQueue();
-    queueTimerRef.current = setInterval(processQueue, 20000);
+    // // immediately try once, then every 20s
+    // processQueue();
+    // queueTimerRef.current = setInterval(processQueue, 20000);
 
-    return () => {
-      if (queueTimerRef.current) clearInterval(queueTimerRef.current);
-    };
+    // return () => {
+    //   if (queueTimerRef.current) clearInterval(queueTimerRef.current);
+    // };
   }, [hasShareIntent, processQueue]);
 
   // 🔹 Initial category load
@@ -176,8 +177,6 @@ export default function HomeScreen() {
     setPendingDelete(cat);
     setConfirmOpen(true);
   };
-
-  console.log(categories);
 
   return (
     <LinearGradient

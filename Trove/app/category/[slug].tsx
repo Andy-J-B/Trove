@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+// app/category/[slug].tsx
+import React, { useEffect, useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -36,9 +37,7 @@ const SERVER_URL: string =
 
 export default function CategoryScreen() {
   const { slug } = useLocalSearchParams();
-  console.log(String(slug));
   const [categoryId, categoryName] = String(slug).split("%CATEGORYPAGE%", 2);
-  console.log(categoryId, categoryName);
 
   const category = categoryName.toLowerCase();
   const title = titleCase(categoryName);
@@ -48,7 +47,9 @@ export default function CategoryScreen() {
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<Product[]>([]);
 
-  // ---------------- Fetch Products ----------------
+  // -------------------------------------------------
+  // Load products for the selected category
+  // -------------------------------------------------
   const loadItems = useCallback(async () => {
     setError(null);
     setLoading(true);
@@ -56,9 +57,7 @@ export default function CategoryScreen() {
       const deviceId = await getDeviceId();
       const res = await axios.get(
         `${SERVER_URL}/products/by-category/${categoryId}`,
-        {
-          headers: { "x-device-id": deviceId },
-        }
+        { headers: { "x-device-id": deviceId } }
       );
       const data = Array.isArray(res.data) ? res.data : [];
       setItems(data);
@@ -69,7 +68,7 @@ export default function CategoryScreen() {
     } finally {
       setLoading(false);
     }
-  }, [category]);
+  }, [categoryId]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -83,15 +82,16 @@ export default function CategoryScreen() {
   useEffect(() => {
     let mounted = true;
     (async () => {
-      if (!mounted) return;
-      await loadItems();
+      if (mounted) await loadItems();
     })();
     return () => {
       mounted = false;
     };
   }, [loadItems]);
 
-  // ---------------- Delete Item ----------------
+  // -------------------------------------------------
+  // Delete a product (kept unchanged)
+  // -------------------------------------------------
   async function deleteItem(id: string | number) {
     try {
       const deviceId = await getDeviceId();
@@ -99,7 +99,6 @@ export default function CategoryScreen() {
         headers: { "x-device-id": deviceId },
       });
       const data = res.data;
-
       if (!data?.success) throw new Error(data?.error || "Delete failed");
       setItems((prev) => prev.filter((p) => String(p.id) !== String(id)));
     } catch (e: any) {
@@ -114,23 +113,13 @@ export default function CategoryScreen() {
     ]);
   }
 
-  // ---------------- Open TikTok Link ----------------
-  async function handleOpenLink(url?: string) {
-    if (!url) {
-      Alert.alert(
-        "No link available",
-        "This item doesn't have a valid TikTok URL."
-      );
-      return;
-    }
-
-    try {
-      await Linking.openURL(url);
-    } catch (err) {
-      console.error("Error opening TikTok link:", err);
-      Alert.alert("Error", "Failed to open TikTok link.");
-    }
-  }
+  // -------------------------------------------------
+  // Navigation – open the product‑detail page instead of TikTok
+  // -------------------------------------------------
+  const goToProduct = (productId: string | number) => {
+    // The product detail screen lives at /product/[productId]
+    router.push(`/product/${productId}`);
+  };
 
   return (
     <View style={styles.container}>
@@ -172,9 +161,10 @@ export default function CategoryScreen() {
             const displayTitle = item.name || item.title || `#${item.id}`;
             return (
               <View style={styles.cardRow}>
+                {/* ---------- TAP TO PRODUCT DETAIL ---------- */}
                 <Pressable
                   style={styles.card}
-                  onPress={() => handleOpenLink(item.tiktokUrl)}
+                  onPress={() => goToProduct(item.id)}
                 >
                   <Text style={styles.cardTitle} numberOfLines={1}>
                     {displayTitle}
@@ -186,6 +176,7 @@ export default function CategoryScreen() {
                   )}
                 </Pressable>
 
+                {/* ---------- DELETE BUTTON ---------- */}
                 <Pressable
                   style={styles.deleteBtn}
                   onPress={() => confirmDelete(item.id, displayTitle)}
@@ -204,6 +195,9 @@ export default function CategoryScreen() {
   );
 }
 
+/* -------------------------------------------------
+   Styles (unchanged)
+------------------------------------------------- */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000", padding: 16 },
   backBtn: { paddingHorizontal: 8, paddingVertical: 4 },

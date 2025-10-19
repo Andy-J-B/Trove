@@ -1,6 +1,7 @@
 // utils/queue.ts
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AppState } from "react-native";
+import NetInfo from "@react-native-community/netinfo";
 
 // 🔹 Replace with your backend API endpoint
 
@@ -20,15 +21,23 @@ export async function enqueue(url: string, deviceId: string) {
   await AsyncStorage.setItem(KEY, JSON.stringify(arr));
 }
 
-// 🟦 Send all items to backend and clear queue
-export async function flushQueue() {
-  const raw = await AsyncStorage.getItem(KEY);
-  if (!raw) return;
+let isFlushing = false; // module‑scoped flag
 
-  const items: QueueItem[] = JSON.parse(raw);
-  if (items.length === 0) return;
+export async function flushQueue() {
+  if (isFlushing) {
+    console.log("🚧 flushQueue already running – skipping duplicate call");
+    return;
+  }
+  isFlushing = true;
 
   try {
+    const raw = await AsyncStorage.getItem(KEY);
+    if (!raw) return;
+
+    const items: QueueItem[] = JSON.parse(raw);
+    if (items.length === 0) return;
+    console.log("💦 FLUSHING", items);
+
     for (const { url, deviceId } of items) {
       await fetch(`${SERVER_URL}/queue`, {
         method: "POST",
@@ -36,10 +45,14 @@ export async function flushQueue() {
         body: JSON.stringify({ url, deviceId }),
       });
     }
-    // Clear queue after successful flush
+
+    // If every POST succeeded we can safely empty the local queue
     await AsyncStorage.setItem(KEY, JSON.stringify([]));
   } catch (err) {
     console.error("❌ Failed to flush queue:", err);
+    // keep the items in AsyncStorage – they’ll be retried next time
+  } finally {
+    isFlushing = false;
   }
 }
 
@@ -54,9 +67,18 @@ export async function clearQueue() {
   await AsyncStorage.setItem(KEY, JSON.stringify([]));
 }
 
-// 🟪 Automatically flush when app becomes active
-AppState.addEventListener("change", (state) => {
-  if (state === "active") {
-    flushQueue();
+AppState.addEventListener("change", async (state) => {
+  if (state !== "active") return;
+
+  const isConnected = (await NetInfo.fetch()).isConnected;
+  if (!isConnected) {
+    console.log("📡 No network – will retry flushing later.");
+    return;
   }
+  console.log("TRY Flushing");
+
+  const raw = await AsyncStorage.getItem(KEY);
+  if (!raw) return; // nothing to send
+
+  await flushQueue(); // your existing function
 });
