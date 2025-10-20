@@ -8,6 +8,20 @@
     "scheme": "trove",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "extra": {
+      "SERVER_URL": "https://trove-37je.onrender.com/api",
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [{}]
+            }
+          }
+        },
+        "projectId": "19675d9b-c4fe-44a0-8c1e-e86fe7f4bec0"
+      },
+      "router": {}
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.andybae.trove"
