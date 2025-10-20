@@ -26,6 +26,7 @@ export interface Category {
   name: string;
   description?: string;
   createdAt?: string;
+  itemCount: number;
 }
 
 export interface CategoryGridProps {
