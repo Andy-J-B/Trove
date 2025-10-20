@@ -22,7 +22,8 @@ export const CategoryListItem: React.FC<CategoryListItemProps> = ({
   onPress,
   onDelete,
 }) => {
-  const itemCountText = category.itemCount === 1 ? "1 item" : `${category.itemCount} items`;
+  const itemCount = category.itemCount ?? 0;
+  const itemCountText = itemCount === 1 ? "1 item" : `${itemCount} items`;
 
   return (
     <Pressable
@@ -70,20 +71,21 @@ export const CategoryListItem: React.FC<CategoryListItemProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    height: 80,
+    minHeight: 88,
     borderRadius: 16,
     backgroundColor: "#1c1c1c",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.06)",
     marginVertical: 8,
+    marginHorizontal: 8,
     overflow: "hidden",
   },
   content: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
   },
   deleteBtn: {
     position: "absolute",

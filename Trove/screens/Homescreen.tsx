@@ -225,7 +225,7 @@ export default function HomeScreen() {
             shadowOpacity: 0.3,
             shadowRadius: 8,
           }}
-          textStyle={{ fontWeight: "800", fontSize: 28 }}
+          textStyle={{ fontWeight: "800", fontSize: 28, lineHeight: 28, textAlign: "center" }}
         />
       </SafeAreaView>
 
