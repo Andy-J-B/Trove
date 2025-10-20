@@ -87,6 +87,7 @@ export const CategoryList: React.FC<CategoryListProps> = ({
 const styles = StyleSheet.create({
   contentContainer: {
     paddingVertical: 12,
+    paddingHorizontal: 12,
     paddingBottom: 100, // Extra padding for floating button
   },
   errorText: {

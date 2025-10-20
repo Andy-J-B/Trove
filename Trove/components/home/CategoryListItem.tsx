@@ -75,7 +75,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#1c1c1c",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.06)",
-    marginHorizontal: 12,
     marginVertical: 8,
     overflow: "hidden",
   },

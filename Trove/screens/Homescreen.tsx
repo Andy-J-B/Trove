@@ -22,6 +22,8 @@ const SERVER_URL =
   "http://127.0.0.1:3000/api";
 
 export default function HomeScreen() {
+  console.log("🏠 HomeScreen rendering...");
+  
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
   const { processQueue } = useQueueProcessor();
 
@@ -48,19 +50,30 @@ export default function HomeScreen() {
     try {
       // 1️⃣ Get the device ID from SecureStore / Expo
       const deviceId = await getDeviceId();
+      console.log("📱 Device ID:", deviceId);
 
       // 2️⃣ Make the request with x-device-id header
+      console.log("🌐 Fetching categories from:", `${SERVER_URL}/categories`);
       const res = await axios.get(`${SERVER_URL}/categories`, {
         headers: {
           "x-device-id": deviceId,
         },
       });
 
+      console.log("✅ API Response status:", res.status);
+      console.log("📦 API Response data:", JSON.stringify(res.data, null, 2));
+
       // 3️⃣ Normalize response
       const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
+      console.log("📊 Normalized categories count:", data.length);
       setCategories(data);
     } catch (err) {
-      console.error(err);
+      console.error("❌ Error fetching categories:", err);
+      if (axios.isAxiosError(err)) {
+        console.error("   Status:", err.response?.status);
+        console.error("   Data:", err.response?.data);
+        console.error("   Message:", err.message);
+      }
       setCatError("Failed to load categories");
     } finally {
       setCatLoading(false);
@@ -178,12 +191,14 @@ export default function HomeScreen() {
     setConfirmOpen(true);
   };
 
+  console.log("🏠 HomeScreen render - categories:", categories.length, "loading:", catLoading);
+
   return (
     <LinearGradient
       colors={["#000000", "#070707", "#000000"]}
       style={{ flex: 1 }}
     >
-      <SafeAreaView style={{ flex: 1, paddingHorizontal: 12 }}>
+      <SafeAreaView style={{ flex: 1 }}>
         <HomeHeader />
 
         <CategoryList
