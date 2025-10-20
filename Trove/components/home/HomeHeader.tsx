@@ -17,7 +17,7 @@ export const HomeHeader: React.FC = () => (
         style={styles.logo}
         resizeMode="contain"
       />
-      <AppText variant="title" bold style={styles.text}>
+      <AppText style={styles.text}>
         TROVE
       </AppText>
     </View>
@@ -25,13 +25,14 @@ export const HomeHeader: React.FC = () => (
 );
 
 const styles = StyleSheet.create({
-  wrap: { alignItems: "center", justifyContent: "center", marginBottom: 6 },
+  wrap: { alignItems: "center", justifyContent: "center", marginBottom: 12, marginTop: 8 },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "center" },
-  logo: { width: 64, height: 64, marginRight: 16 },
+  logo: { width: 56, height: 56, marginRight: 12 },
   text: {
-    fontSize: 44,
-    fontWeight: "900",
-    letterSpacing: 3,
+    fontSize: 36,
+    fontWeight: "700",
+    letterSpacing: 2,
     textAlign: "center",
+    color: "#fff",
   },
 });
