@@ -14,6 +14,7 @@ import Constants from "expo-constants";
 import { Linking } from "react-native";
 import axios from "axios";
 import { getDeviceId } from "@/util/device";
+import { Swipeable } from "react-native-gesture-handler";
 
 type Product = {
   id: string | number;
@@ -159,9 +160,18 @@ export default function CategoryScreen() {
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           renderItem={({ item }) => {
             const displayTitle = item.name || item.title || `#${item.id}`;
+            
+            const renderRightActions = () => (
+              <Pressable
+                style={styles.deleteAction}
+                onPress={() => confirmDelete(item.id, displayTitle)}
+              >
+                <Text style={styles.deleteActionText}>Delete</Text>
+              </Pressable>
+            );
+
             return (
-              <View style={styles.cardRow}>
-                {/* ---------- TAP TO PRODUCT DETAIL ---------- */}
+              <Swipeable renderRightActions={renderRightActions}>
                 <Pressable
                   style={styles.card}
                   onPress={() => goToProduct(item.id)}
@@ -175,15 +185,7 @@ export default function CategoryScreen() {
                     </Text>
                   )}
                 </Pressable>
-
-                {/* ---------- DELETE BUTTON ---------- */}
-                <Pressable
-                  style={styles.deleteBtn}
-                  onPress={() => confirmDelete(item.id, displayTitle)}
-                >
-                  <Text style={styles.deleteText}>Delete</Text>
-                </Pressable>
-              </View>
+              </Swipeable>
             );
           }}
           contentContainerStyle={{ paddingBottom: 24 }}
@@ -207,26 +209,25 @@ const styles = StyleSheet.create({
   loadingText: { color: "#fff", marginLeft: 8 },
   errorText: { color: "#ff6b6b", fontSize: 14 },
   centerRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  cardRow: { flexDirection: "row", alignItems: "stretch", gap: 8 },
   card: {
-    flex: 1,
     backgroundColor: "#111",
     padding: 12,
     borderRadius: 10,
   },
   cardTitle: { color: "#fff", fontSize: 16, fontWeight: "700" },
   cardSubtitle: { color: "#bbb", marginTop: 4 },
-  deleteBtn: {
-    alignSelf: "stretch",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: "rgba(255, 59, 48, 0.15)",
-    borderColor: "rgba(255, 59, 48, 0.45)",
-    borderWidth: 1,
-    borderRadius: 10,
+  deleteAction: {
+    backgroundColor: "#ff3b30",
     justifyContent: "center",
-    minWidth: 76,
+    alignItems: "center",
+    width: 80,
+    borderRadius: 10,
+    marginLeft: 8,
   },
-  deleteText: { color: "#ff6b6b", fontWeight: "800", textAlign: "center" },
+  deleteActionText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 14,
+  },
   separator: { height: 10 },
 });
