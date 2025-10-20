@@ -60,7 +60,7 @@ export const CategoryGrid: React.FC<Props> = ({
           <Feather name="folder" size={48} color="white" />
           <AppText bold>{item.name}</AppText>
           <Text style={styles.itemCount}>
-            {item.itemCount === 1 ? `${item.itemCount} item` : `${item.itemCount} items`}
+            {(item.itemCount ?? 0) === 1 ? `${item.itemCount ?? 0} item` : `${item.itemCount ?? 0} items`}
           </Text>
         </View>
       </View>
@@ -106,8 +106,8 @@ const styles = StyleSheet.create({
   },
   row: { 
     justifyContent: "center",
-    gap: 12,
-    marginBottom: 16,
+    gap: 20,
+    marginBottom: 20,
   },
   card: {
     width: 150,
