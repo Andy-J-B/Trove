@@ -7,7 +7,7 @@ import axios from "axios";
 import Constants from "expo-constants";
 import { enqueue, clearQueue } from "../src/queue";
 import { HomeHeader } from "../components/home/HomeHeader";
-import { CategoryGrid } from "../components/home/CategoryGrid";
+import { CategoryList } from "../components/home/CategoryList";
 import { AddCategoryModal } from "../components/home/AddCategoryModal";
 import { ConfirmDeleteModal } from "../components/home/ConfirmDeleteModal";
 import { AppButton } from "../components/ui/AppButton";
@@ -186,7 +186,7 @@ export default function HomeScreen() {
       <SafeAreaView style={{ flex: 1, paddingHorizontal: 12 }}>
         <HomeHeader />
 
-        <CategoryGrid
+        <CategoryList
           data={categories}
           loading={catLoading}
           error={catError}
@@ -199,13 +199,18 @@ export default function HomeScreen() {
           onPress={() => setAddOpen(true)}
           style={{
             position: "absolute",
-            bottom: 40,
-            alignSelf: "center",
-            width: 64,
-            height: 64,
-            borderRadius: 32,
+            bottom: 24,
+            right: 24,
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            elevation: 8,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
           }}
-          textStyle={{ fontWeight: "800", fontSize: 30 }}
+          textStyle={{ fontWeight: "800", fontSize: 28 }}
         />
       </SafeAreaView>
 
