@@ -1,5 +1,5 @@
 // app/category/[slug].tsx
-import React, { useEffect, useCallback, useState } from "react";
+import React, { useEffect, useCallback, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -47,6 +47,9 @@ export default function CategoryScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<Product[]>([]);
+  
+  // Store refs for each swipeable row
+  const swipeableRefs = useRef<Map<string | number, Swipeable>>(new Map());
 
   // -------------------------------------------------
   // Load products for the selected category
@@ -91,7 +94,7 @@ export default function CategoryScreen() {
   }, [loadItems]);
 
   // -------------------------------------------------
-  // Delete a product (kept unchanged)
+  // Delete a product
   // -------------------------------------------------
   async function deleteItem(id: string | number) {
     try {
@@ -101,6 +104,9 @@ export default function CategoryScreen() {
       });
       const data = res.data;
       if (!data?.success) throw new Error(data?.error || "Delete failed");
+      
+      // Close the swipeable before removing from list
+      swipeableRefs.current.get(id)?.close();
       setItems((prev) => prev.filter((p) => String(p.id) !== String(id)));
     } catch (e: any) {
       Alert.alert("Delete failed", e?.message ?? "Unable to delete item.");
@@ -109,8 +115,16 @@ export default function CategoryScreen() {
 
   function confirmDelete(id: string | number, label: string) {
     Alert.alert("Delete item", `Remove "${label}"?`, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: () => deleteItem(id) },
+      { 
+        text: "Cancel", 
+        style: "cancel",
+        onPress: () => swipeableRefs.current.get(id)?.close()
+      },
+      { 
+        text: "Delete", 
+        style: "destructive", 
+        onPress: () => deleteItem(id) 
+      },
     ]);
   }
 
@@ -161,17 +175,30 @@ export default function CategoryScreen() {
           renderItem={({ item }) => {
             const displayTitle = item.name || item.title || `#${item.id}`;
             
-            const renderRightActions = () => (
-              <Pressable
-                style={styles.deleteAction}
-                onPress={() => confirmDelete(item.id, displayTitle)}
-              >
-                <Text style={styles.deleteActionText}>Delete</Text>
-              </Pressable>
-            );
+            const renderRightActions = () => {
+              return (
+                <View style={styles.deleteAction}>
+                  <Pressable
+                    style={styles.deleteActionInner}
+                    onPress={() => confirmDelete(item.id, displayTitle)}
+                  >
+                    <Text style={styles.deleteActionText}>Delete</Text>
+                  </Pressable>
+                </View>
+              );
+            };
 
             return (
-              <Swipeable renderRightActions={renderRightActions}>
+              <Swipeable
+                ref={(ref) => {
+                  if (ref) {
+                    swipeableRefs.current.set(item.id, ref);
+                  } else {
+                    swipeableRefs.current.delete(item.id);
+                  }
+                }}
+                renderRightActions={renderRightActions}
+              >
                 <Pressable
                   style={styles.card}
                   onPress={() => goToProduct(item.id)}
@@ -217,12 +244,15 @@ const styles = StyleSheet.create({
   cardTitle: { color: "#fff", fontSize: 16, fontWeight: "700" },
   cardSubtitle: { color: "#bbb", marginTop: 4 },
   deleteAction: {
+    width: 80,
+    marginLeft: 8,
+  },
+  deleteActionInner: {
     backgroundColor: "#ff3b30",
     justifyContent: "center",
     alignItems: "center",
-    width: 80,
+    flex: 1,
     borderRadius: 10,
-    marginLeft: 8,
   },
   deleteActionText: {
     color: "#fff",
