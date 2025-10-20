@@ -57,8 +57,11 @@ export const CategoryGrid: React.FC<Props> = ({
         </Pressable>
 
         <View style={styles.cardInner}>
-          <Feather name="folder" size={40} color="white" />
+          <Feather name="folder" size={48} color="white" />
           <AppText bold>{item.name}</AppText>
+          <Text style={styles.itemCount}>
+            {item.itemCount === 1 ? `${item.itemCount} item` : `${item.itemCount} items`}
+          </Text>
         </View>
       </View>
     </Pressable>
@@ -77,7 +80,7 @@ export const CategoryGrid: React.FC<Props> = ({
         <RefreshControl
           refreshing={loading}
           onRefresh={onRefresh}
-          tintColor="#fff"
+          tintColor="#8b5cf6"
         />
       }
       ListHeaderComponent={
@@ -95,18 +98,25 @@ export const CategoryGrid: React.FC<Props> = ({
 };
 
 const styles = StyleSheet.create({
-  grid: { justifyContent: "center", paddingVertical: 20, alignItems: "center" },
-  row: { justifyContent: "center" },
+  grid: { 
+    justifyContent: "center", 
+    paddingVertical: 20, 
+    paddingHorizontal: 16,
+    alignItems: "center" 
+  },
+  row: { 
+    justifyContent: "center",
+    gap: 12,
+    marginBottom: 16,
+  },
   card: {
     width: 150,
     height: 140,
-    borderRadius: 20,
+    borderRadius: 18,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-    backgroundColor: "#1c1c1c",
-    marginHorizontal: 7,
-    marginBottom: 16,
+    borderColor: "rgba(139, 92, 246, 0.1)",
+    backgroundColor: "#1e1b2e",
     alignItems: "center",
   },
   cardInner: {
@@ -114,7 +124,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    padding: 14,
+    padding: 16,
+  },
+  itemCount: {
+    color: "#9ca3af",
+    fontSize: 14,
+    marginTop: 4,
   },
   deleteBtn: {
     position: "absolute",
