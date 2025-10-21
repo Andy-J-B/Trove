@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "extra": {
-      "SERVER_URL": "http://10.0.0.17:3000/api",
+      "SERVER_URL": "https://trove-37je.onrender.com/api",
       "_comment_SERVER_URL": "⚠️ TEMPORARY: Using local server for testing. Change back to 'https://trove-37je.onrender.com/api' before deploying to production!",
       "eas": {
         "build": {
