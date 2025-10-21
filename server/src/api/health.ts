@@ -1,5 +1,6 @@
 // src/api/health.ts
-import { Router, Request, Response } from "express";
+import { Router } from "express";
+import type { Request, Response } from "express";
 
 // src/api/health.ts  (or create a dedicated status file)
 
