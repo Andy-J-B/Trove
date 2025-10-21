@@ -1,54 +1,32 @@
-# -------------------- 1. Build Stage --------------------
-# Use a specific, stable Node version for building
+# ====================== 1️⃣  Builder Stage ======================
 FROM node:20-alpine AS builder
-
 WORKDIR /app
 
-# Install dependencies, including devDependencies for TypeScript and compilation tools
-COPY package.json ./
-COPY package-lock.json ./
-RUN npm ci --omit=dev
-
-# Copy source files
-COPY src ./src
-COPY prisma ./prisma
-COPY server.ts ./
-COPY tsconfig.json ./
-
-# 🔨 Compile TypeScript to JavaScript
-# You need a build script in package.json, e.g., "build": "tsc" or "build": "npm run prisma:generate && tsc"
-RUN npm run build 
-
-# -------------------- 2. Final Stage (Production) --------------------
-# Use a smaller base image for production
-FROM node:20-alpine AS final
-
-# Set the working directory
-WORKDIR /app
-
-# 📋 Copy ONLY the compiled JS, production dependencies, and required files
-# 1. Copy package.json (to install production dependencies)
+# Install ALL deps (dev + prod) – we need TypeScript & Prisma CLI here
 COPY package*.json ./
+RUN npm ci                     # <-- keep dev deps
 
-# 2. Install production dependencies (skipping dev dependencies)
+# Bring in source code, prisma schema, server entry and tsconfig
+COPY . .
+
+# Compile TypeScript (outDir = ./dist) and generate Prisma client
+RUN npm run build             # runs: npm run prisma:generate && tsc
+
+# ====================== 2️⃣  Production Stage ======================
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+# Install ONLY runtime dependencies
+COPY package*.json ./
 RUN npm ci --omit=dev
 
-# 3. Copy compiled JavaScript files (assuming your tsconfig.json's outDir is 'dist')
+# Copy the compiled app and Prisma engine files
 COPY --from=builder /app/dist ./dist
-
-# 4. Copy the prisma schema and engine files
-COPY prisma/schema.prisma ./prisma/
+COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
-# 5. Copy any non-TS files needed (like environment templates or assets)
-# COPY assets ./assets 
-
-# Set environment variable
 ENV NODE_ENV=production
-
-# Expose the application port
 EXPOSE 3000
 
-# 🚀 Run the application using Node on the compiled JS file
-# Assuming your entry file (server.ts) compiles to dist/server.js
+# Run the compiled entry point
 CMD ["node", "dist/server.js"]

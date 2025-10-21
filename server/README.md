@@ -22,3 +22,4 @@
 └── lib
 ├── db.ts
 └── redis.ts
+└── tsconfig.json
