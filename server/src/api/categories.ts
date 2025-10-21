@@ -2,6 +2,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/db";
 import { ensureDevice } from "../lib/device";
+import { getCategoryIcon } from "../utils/iconMapper";
 
 const router = Router();
 
@@ -21,13 +22,15 @@ router.post("/", async (req, res, next) => {
     const deviceId = getDeviceId(req);
     const { name, description } = req.body;
 
+    // Auto-assign icon based on category name
+    const iconName = getCategoryIcon(name);
+
     const category = await prisma.category.create({
       data: {
         deviceId,
         name,
         description,
-        // We keep an `icon` field in the local SQLite cache only.
-        // If you ever want it server‑side, add `icon` to the Prisma model.
+        iconName,
       },
     });
     res.status(201).json(category);
@@ -63,6 +66,7 @@ router.get("/", async (req, res, next) => {
       deviceId: cat.deviceId,
       name: cat.name,
       description: cat.description,
+      iconName: cat.iconName,
       isDeleted: cat.isDeleted,
       createdAt: cat.createdAt,
       updatedAt: cat.updatedAt,
