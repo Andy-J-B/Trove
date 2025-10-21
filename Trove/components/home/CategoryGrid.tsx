@@ -57,7 +57,7 @@ export const CategoryGrid: React.FC<Props> = ({
         </Pressable>
 
         <View style={styles.cardInner}>
-          <Feather name="folder" size={48} color="white" />
+          <Feather name={item.iconName || "folder"} size={48} color="white" />
           <AppText bold>{item.name}</AppText>
           <Text style={styles.itemCount}>
             {(item.itemCount ?? 0) === 1 ? `${item.itemCount ?? 0} item` : `${item.itemCount ?? 0} items`}
