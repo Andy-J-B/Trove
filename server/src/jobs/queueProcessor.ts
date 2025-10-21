@@ -56,7 +56,7 @@ async function processJob(job: Job) {
 
     await prisma.$transaction(async (tx) => {
       for (const cat of geminiCategories) {
-        // ----- Upsert Category (device‑scoped) -----
+        // ----- Upsert Category (device-scoped) -----
         const category = await tx.category.upsert({
           where: {
             deviceId_name: {
@@ -68,12 +68,22 @@ async function processJob(job: Job) {
             deviceId: queueItem.deviceId,
             name: cat.name,
             description: cat.description ?? null,
+            // New categories start with a count of 0 or the count of new products
+            productCount: 0,
           },
           update: {}, // keep existing
         });
 
+        // Track how many *new* products are being created in this category
+        let productsCreatedInThisCategory = 0;
+
         // ----- Upsert each Product in the Category -----
         for (const prod of cat.products) {
+          // Attempt to find the product first
+          const existingProduct = await tx.product.findUnique({
+            where: { id: prod.id ?? `${category.id}-${prod.name}` },
+          });
+
           // Upsert returns the fields we asked for via `select`
           const product = await tx.product.upsert({
             where: {
@@ -94,8 +104,25 @@ async function processJob(job: Job) {
             },
           });
 
-          // Remember the newly‑created (or already‑existing) product
+          // Check if this was a brand-new creation (i.e., no existing product found)
+          if (!existingProduct) {
+            productsCreatedInThisCategory++;
+          }
+
+          // Remember the newly-created (or already-existing) product
           createdProducts.push({ id: product.id, name: product.name });
+        }
+
+        // ----- 🛑 ADDED: Increment productCount if new products were created -----
+        if (productsCreatedInThisCategory > 0) {
+          await tx.category.update({
+            where: { id: category.id },
+            data: {
+              productCount: {
+                increment: productsCreatedInThisCategory,
+              },
+            },
+          });
         }
       }
     });
