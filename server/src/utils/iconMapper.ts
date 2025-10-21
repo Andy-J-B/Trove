@@ -4,6 +4,13 @@
  */
 
 const ICON_MAP: Record<string, string> = {
+  // Beauty & Personal Care (check these first to avoid "car" matching)
+  skincare: 'droplet',
+  haircare: 'scissors',
+  makeup: 'star',
+  beauty: 'star',
+  cosmetic: 'star',
+  
   // Technology & Electronics
   tech: 'smartphone',
   technology: 'smartphone',
@@ -81,8 +88,11 @@ const ICON_MAP: Record<string, string> = {
 export function getCategoryIcon(categoryName: string): string {
   const normalized = categoryName.toLowerCase().trim();
   
+  // Sort keywords by length (longest first) to match more specific terms before generic ones
+  const sortedEntries = Object.entries(ICON_MAP).sort((a, b) => b[0].length - a[0].length);
+  
   // Check each keyword in the icon map
-  for (const [keyword, iconName] of Object.entries(ICON_MAP)) {
+  for (const [keyword, iconName] of sortedEntries) {
     if (normalized.includes(keyword)) {
       return iconName;
     }
