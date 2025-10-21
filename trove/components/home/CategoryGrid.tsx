@@ -57,10 +57,12 @@ export const CategoryGrid: React.FC<Props> = ({
         </Pressable>
 
         <View style={styles.cardInner}>
-          <Feather name="folder" size={48} color="white" />
+          <Feather name={item.iconName || "folder"} size={48} color="white" />
           <AppText bold>{item.name}</AppText>
-          <Text style={styles.itemCount}>
-            {(item.itemCount ?? 0) === 1 ? `${item.itemCount ?? 0} item` : `${item.itemCount ?? 0} items`}
+          <Text style={styles.productCount}>
+            {(item.productCount ?? 0) === 1
+              ? `${item.productCount ?? 0} item`
+              : `${item.productCount ?? 0} items`}
           </Text>
         </View>
       </View>
@@ -98,13 +100,13 @@ export const CategoryGrid: React.FC<Props> = ({
 };
 
 const styles = StyleSheet.create({
-  grid: { 
-    justifyContent: "center", 
-    paddingVertical: 20, 
+  grid: {
+    justifyContent: "center",
+    paddingVertical: 20,
     paddingHorizontal: 16,
-    alignItems: "center" 
+    alignItems: "center",
   },
-  row: { 
+  row: {
     justifyContent: "center",
     gap: 20,
     marginBottom: 20,
@@ -126,7 +128,7 @@ const styles = StyleSheet.create({
     gap: 8,
     padding: 16,
   },
-  itemCount: {
+  productCount: {
     color: "#9ca3af",
     fontSize: 14,
     marginTop: 4,

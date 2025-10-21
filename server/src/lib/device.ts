@@ -1,5 +1,5 @@
 // src/lib/device.ts
-import { prisma } from "./db";
+import { prisma } from "./db.js";
 
 /**
  * Guarantees that a Device row exists for the supplied `deviceId`.

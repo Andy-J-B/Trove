@@ -1,11 +1,13 @@
 {
-  "name": "tiktok-product-extractor-api",
+  "name": "trove",
   "version": "1.0.0",
-  "description": "MVP API to extract products from TikTok videos",
+  "description": "Server for Trove",
   "main": "server.js",
   "scripts": {
     "dev": "nodemon --watch . --exec tsx server.ts",
-    "start": "tsx server.ts"
+    "start": "tsx server.ts",
+    "build": "npm run prisma:generate && tsc",
+    "prisma:generate": "npx prisma generate"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -26,7 +28,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/morgan": "^1.9.10",
-    "@types/node": "^24.8.1",
+    "@types/node": "^24.9.1",
     "nodemon": "^3.0.1",
     "prisma": "^6.17.1",
     "ts-node": "^10.9.2",

@@ -1,7 +1,8 @@
 // src/api/categories.ts
 import { Router } from "express";
-import { prisma } from "../lib/db";
-import { ensureDevice } from "../lib/device";
+import { prisma } from "../lib/db.js";
+import { ensureDevice } from "../lib/device.js";
+import { getCategoryIcon } from "../utils/iconMapper.js";
 
 const router = Router();
 
@@ -21,13 +22,15 @@ router.post("/", async (req, res, next) => {
     const deviceId = getDeviceId(req);
     const { name, description } = req.body;
 
+    // Auto-assign icon based on category name
+    const iconName = getCategoryIcon(name);
+
     const category = await prisma.category.create({
       data: {
         deviceId,
         name,
         description,
-        // We keep an `icon` field in the local SQLite cache only.
-        // If you ever want it server‑side, add `icon` to the Prisma model.
+        iconName,
       },
     });
     res.status(201).json(category);
@@ -45,28 +48,19 @@ router.get("/", async (req, res, next) => {
 
     const categories = await prisma.category.findMany({
       where: { deviceId, isDeleted: false },
-      include: {
-        _count: {
-          select: {
-            products: {
-              where: { isDeleted: false }
-            }
-          }
-        }
-      },
       orderBy: { name: "asc" },
     });
 
-    // Map response to include itemCount field
-    const categoriesWithCount = categories.map(cat => ({
+    // No extra counting – we just expose the persisted productCount column.
+    const categoriesWithCount = categories.map((cat) => ({
       id: cat.id,
       deviceId: cat.deviceId,
       name: cat.name,
       description: cat.description,
+      iconName: cat.iconName,
       isDeleted: cat.isDeleted,
       createdAt: cat.createdAt,
-      updatedAt: cat.updatedAt,
-      itemCount: cat._count.products
+      productCount: cat.productCount, // <-- NEW field
     }));
 
     res.json(categoriesWithCount);

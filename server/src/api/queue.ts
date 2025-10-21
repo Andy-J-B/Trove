@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { prisma } from "../lib/db";
+import { prisma } from "../lib/db.js";
 import { Queue } from "bullmq";
-import { redisConnection } from "../lib/redis";
-import { ensureDevice } from "../lib/device";
+import { redisConnection } from "../lib/redis.js";
+import { ensureDevice } from "../lib/device.js";
 import crypto from "crypto";
 
 const router = Router();

@@ -9,7 +9,7 @@
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { prisma } from "../lib/db";
+import { prisma } from "../lib/db.js";
 
 export interface GeminiProduct {
   id: string;
@@ -195,14 +195,21 @@ export async function extractProducts(
           products: [],
         };
       }
-      byCategory[catName].products.push({
+
+      const newProduct: GeminiProduct = {
         id: prod.id,
         name: prod.name,
         category: prod.category,
         description: prod.description,
-        icon: prod.icon,
-        mentioned_context: prod.mentioned_context,
-      });
+        // ✅ Only include icon if it is NOT undefined
+        ...(prod.icon !== undefined && { icon: prod.icon }),
+        // ✅ Only include mentioned_context if it is NOT undefined
+        ...(prod.mentioned_context !== undefined && {
+          mentioned_context: prod.mentioned_context,
+        }),
+      };
+
+      byCategory[catName].products.push(newProduct);
     }
 
     // Return an array of categories (order does not matter)

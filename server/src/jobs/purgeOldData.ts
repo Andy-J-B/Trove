@@ -1,4 +1,4 @@
-import { prisma } from "../lib/db";
+import { prisma } from "../lib/db.js";
 
 /**
  * Deletes any rows (Product, QueueItem) whose

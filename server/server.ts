@@ -1,19 +1,15 @@
-import express, {
-  Request,
-  Response,
-  NextFunction,
-  RequestHandler,
-} from "express";
+import express from "express";
+import type { Request, Response, NextFunction, RequestHandler } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import helmet from "helmet";
 import morgan from "morgan";
 
 // Import routers (TypeScript files, not JS)
-import healthRouter from "./src/api/health";
-import queueRouter from "./src/api/queue";
-import categoriesRouter from "./src/api/categories";
-import productsRouter from "./src/api/products";
+import healthRouter from "./src/api/health.js";
+import queueRouter from "./src/api/queue.js";
+import categoriesRouter from "./src/api/categories.js";
+import productsRouter from "./src/api/products.js";
 import queueStatusRouter from "./src/api/health.js";
 import shoppingRouter from "./src/api/shopping.js";
 
