@@ -1,6 +1,6 @@
 // src/api/products.ts
 import { Router } from "express";
-import { prisma } from "../lib/db";
+import { prisma } from "../lib/db.js";
 
 const router = Router();
 
@@ -20,25 +20,33 @@ router.post("/", async (req, res, next) => {
       tiktokUrl,
       imageUrl,
       description,
-      categoryId, // client should send the **category** UUID (not name)
+      categoryId, // client sends the **category** UUID
     } = req.body;
 
-    // Verify the category belongs to this device and is not deleted
+    // Verify the category belongs to this device & is not deleted
     const cat = await prisma.category.findFirst({
       where: { id: categoryId, deviceId, isDeleted: false },
     });
     if (!cat) return res.status(400).json({ error: "Invalid category" });
 
-    const product = await prisma.product.create({
-      data: {
-        name,
-        price,
-        tiktokUrl,
-        imageUrl,
-        description,
-        categoryId: cat.id,
-      },
-    });
+    // 👇  One transaction: create product + bump the counter
+    const [product] = await prisma.$transaction([
+      prisma.product.create({
+        data: {
+          name,
+          price,
+          tiktokUrl,
+          imageUrl,
+          description,
+          categoryId: cat.id,
+        },
+      }),
+      prisma.category.update({
+        where: { id: cat.id },
+        data: { productCount: { increment: 1 } },
+      }),
+    ]);
+
     res.status(201).json(product);
   } catch (e) {
     next(e);
@@ -123,21 +131,35 @@ router.get("/:id", async (req, res, next) => {
 router.patch("/:id", async (req, res, next) => {
   try {
     const deviceId = getDeviceId(req);
-    const updates = req.body;
+    const productId = req.params.id;
+    const updates = req.body as any;
 
-    // If the payload tries to move the product to another category,
-    // make sure the new category belongs to this device.
-    if (updates.categoryId) {
-      const cat = await prisma.category.findFirst({
+    // 0️⃣  Load the current product (we need its old categoryId)
+    const current = await prisma.product.findFirst({
+      where: {
+        id: productId,
+        isDeleted: false,
+        category: { deviceId, isDeleted: false },
+      },
+      select: { categoryId: true },
+    });
+
+    if (!current) return res.status(404).json({ error: "Not found" });
+
+    // 1️⃣  If the caller wants to move the product to a new category,
+    //      verify the new category belongs to the same device.
+    if (updates.categoryId && updates.categoryId !== current.categoryId) {
+      const newCat = await prisma.category.findFirst({
         where: { id: updates.categoryId, deviceId, isDeleted: false },
       });
-      if (!cat) return res.status(400).json({ error: "Invalid category" });
+      if (!newCat)
+        return res.status(400).json({ error: "Invalid new category" });
     }
 
-    // Apply the update only if the product belongs to a category of this device
+    // 2️⃣  Perform the update – we will adjust counts if the category changed.
     const updated = await prisma.product.updateMany({
       where: {
-        id: req.params.id,
+        id: productId,
         isDeleted: false,
         category: { deviceId, isDeleted: false },
       },
@@ -146,8 +168,25 @@ router.patch("/:id", async (req, res, next) => {
     if (updated.count === 0)
       return res.status(404).json({ error: "Not found" });
 
+    // 3️⃣  If the category changed, move the counter.
+    if (updates.categoryId && updates.categoryId !== current.categoryId) {
+      await prisma.$transaction([
+        // decrement old category
+        prisma.category.update({
+          where: { id: current.categoryId },
+          data: { productCount: { decrement: 1 } },
+        }),
+        // increment new category
+        prisma.category.update({
+          where: { id: updates.categoryId },
+          data: { productCount: { increment: 1 } },
+        }),
+      ]);
+    }
+
+    // 4️⃣  Return the fresh product (with category relationship)
     const fresh = await prisma.product.findUnique({
-      where: { id: req.params.id },
+      where: { id: productId },
       include: { category: true },
     });
 
@@ -157,30 +196,32 @@ router.patch("/:id", async (req, res, next) => {
   }
 });
 
-/* ------------------- DELETE (soft) ------------------- */
-// src/api/products.ts   (replace the old soft‑delete block)
-
+/* ------------------- DELETE (hard) ------------------- */
 router.delete("/:id", async (req, res, next) => {
   try {
     const deviceId = getDeviceId(req);
     const productId = req.params.id;
 
-    // Verify ownership first – we don’t want to delete someone else’s product.
+    // 1️⃣  Find the product (so we know its current category)
     const product = await prisma.product.findFirst({
       where: {
         id: productId,
-        isDeleted: false, // ignore already‑deleted rows
+        isDeleted: false,
         category: { deviceId, isDeleted: false },
       },
+      select: { id: true, categoryId: true },
     });
 
-    if (!product) {
-      return res.status(404).json({ error: "Product not found" });
-    }
+    if (!product) return res.status(404).json({ error: "Product not found" });
 
-    // This single call permanently deletes the product **and**
-    // all its ShoppingUrl rows thanks to the cascade we added above.
-    await prisma.product.delete({ where: { id: productId } });
+    // 2️⃣  Delete the product **and** decrement the parent count – atomic
+    await prisma.$transaction([
+      prisma.product.delete({ where: { id: product.id } }),
+      prisma.category.update({
+        where: { id: product.categoryId },
+        data: { productCount: { decrement: 1 } },
+      }),
+    ]);
 
     res.json({ deleted: true, success: true });
   } catch (e) {

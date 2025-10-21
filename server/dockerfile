@@ -1,26 +1,53 @@
-# ---------- Build Stage ----------
+# -------------------- 1. Build Stage --------------------
+# Use a specific, stable Node version for building
 FROM node:20-alpine AS builder
+
 WORKDIR /app
 
-# Install dependencies
+# Install dependencies, including devDependencies for TypeScript and compilation tools
 COPY package*.json ./
 RUN npm ci
 
 # Copy source files
 COPY src ./src
 COPY prisma ./prisma
-COPY routes ./routes
 COPY server.ts ./
+COPY tsconfig.json ./
 
-# Generate Prisma client
-RUN npx prisma generate
+# 🔨 Compile TypeScript to JavaScript
+# You need a build script in package.json, e.g., "build": "tsc" or "build": "npm run prisma:generate && tsc"
+RUN npm run build 
 
-# Install tsx globally (for running TS directly)
-RUN npm install -g tsx
+# -------------------- 2. Final Stage (Production) --------------------
+# Use a smaller base image for production
+FROM node:20-alpine AS final
 
-# Expose port and set env
-EXPOSE 3000
+# Set the working directory
+WORKDIR /app
+
+# 📋 Copy ONLY the compiled JS, production dependencies, and required files
+# 1. Copy package.json (to install production dependencies)
+COPY package.json ./
+
+# 2. Install production dependencies (skipping dev dependencies)
+RUN npm ci --omit=dev
+
+# 3. Copy compiled JavaScript files (assuming your tsconfig.json's outDir is 'dist')
+COPY --from=builder /app/dist ./dist
+
+# 4. Copy the prisma schema and engine files
+COPY prisma/schema.prisma ./prisma/
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+
+# 5. Copy any non-TS files needed (like environment templates or assets)
+# COPY assets ./assets 
+
+# Set environment variable
 ENV NODE_ENV=production
 
-# Run the app directly with tsx
-CMD ["tsx", "server.ts"]
+# Expose the application port
+EXPOSE 3000
+
+# 🚀 Run the application using Node on the compiled JS file
+# Assuming your entry file (server.ts) compiles to dist/server.js
+CMD ["node", "dist/server.js"]

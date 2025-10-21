@@ -1,8 +1,8 @@
 // src/api/categories.ts
 import { Router } from "express";
-import { prisma } from "../lib/db";
-import { ensureDevice } from "../lib/device";
-import { getCategoryIcon } from "../utils/iconMapper";
+import { prisma } from "../lib/db.js";
+import { ensureDevice } from "../lib/device.js";
+import { getCategoryIcon } from "../utils/iconMapper.js";
 
 const router = Router();
 
@@ -48,20 +48,11 @@ router.get("/", async (req, res, next) => {
 
     const categories = await prisma.category.findMany({
       where: { deviceId, isDeleted: false },
-      include: {
-        _count: {
-          select: {
-            products: {
-              where: { isDeleted: false }
-            }
-          }
-        }
-      },
       orderBy: { name: "asc" },
     });
 
-    // Map response to include itemCount field
-    const categoriesWithCount = categories.map(cat => ({
+    // No extra counting – we just expose the persisted productCount column.
+    const categoriesWithCount = categories.map((cat) => ({
       id: cat.id,
       deviceId: cat.deviceId,
       name: cat.name,
@@ -69,8 +60,7 @@ router.get("/", async (req, res, next) => {
       iconName: cat.iconName,
       isDeleted: cat.isDeleted,
       createdAt: cat.createdAt,
-      updatedAt: cat.updatedAt,
-      itemCount: cat._count.products
+      productCount: cat.productCount, // <-- NEW field
     }));
 
     res.json(categoriesWithCount);

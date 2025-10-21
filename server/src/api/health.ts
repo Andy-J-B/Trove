@@ -3,7 +3,7 @@ import { Router, Request, Response } from "express";
 
 // src/api/health.ts  (or create a dedicated status file)
 
-import { urlQueue } from "./queue";
+import { urlQueue } from "./queue.js";
 
 const router = Router();
 

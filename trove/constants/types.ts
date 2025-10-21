@@ -26,7 +26,7 @@ export interface Category {
   name: string;
   description?: string;
   iconName?: string;
-  itemCount: number;
+  productCount: number;
   createdAt?: string;
 }
 

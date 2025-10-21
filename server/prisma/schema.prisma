@@ -30,7 +30,10 @@ model Category {
   createdAt   DateTime  @default(now()) @map("created_at")
   isDeleted   Boolean   @default(false) @map("is_deleted")
   device      Device    @relation("DeviceCategories", fields: [deviceId], references: [id])
-  products    Product[] @relation("CategoryProducts") // ✅ remove cascade here
+  products    Product[] @relation("CategoryProducts")   // cascade already defined on Product.side
+
+  // ─────── NEW – keep a live count of how many products belong to the category
+  productCount Int @default(0) @map("product_count")
 
   @@unique([deviceId, name], name: "deviceId_name")
   @@index([deviceId, isDeleted])

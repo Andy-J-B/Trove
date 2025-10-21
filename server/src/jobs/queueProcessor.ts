@@ -1,10 +1,10 @@
 // src/jobs/queueProcessor.ts
 import { Worker, Job } from "bullmq";
-import { redisConnection } from "../lib/redis";
-import { prisma } from "../lib/db";
-import { getTranscript } from "../external/transcriptService";
-import { extractProducts } from "../external/geminiService";
-import { fetchShoppingUrls } from "../external/serpService";
+import { redisConnection } from "../lib/redis.js";
+import { prisma } from "../lib/db.js";
+import { getTranscript } from "../external/transcriptService.js";
+import { extractProducts } from "../external/geminiService.js";
+import { fetchShoppingUrls } from "../external/serpService.js";
 
 /**
  * Helper – set the status of a QueueItem.
@@ -111,19 +111,34 @@ async function processJob(job: Job) {
       for (const shopping_option of shoppingLinks) {
         await prisma.shoppingUrl.upsert({
           where: {
-            // deterministic composite key – avoids duplicate rows on retries
             id: `${productId}-${shopping_option.link}`,
           },
           create: {
             id: `${productId}-${shopping_option.link}`,
             productId,
             url: shopping_option.link,
-            price: shopping_option.price,
-            source: shopping_option.source,
-            sourceIcon: shopping_option.source_icon,
-            thumbnail:
-              shopping_option.thumbnail ?? shopping_option.serpapi_thumbnail,
-            delivery: shopping_option.delivery,
+            // 🛑 FIX: Use conditional spreading for all optional/nullable fields
+            // Only include the property if the value is NOT undefined (or NOT null)
+
+            ...(shopping_option.price !== undefined && {
+              price: shopping_option.price,
+            }),
+            ...(shopping_option.source !== undefined && {
+              source: shopping_option.source,
+            }),
+            ...(shopping_option.source_icon !== undefined && {
+              sourceIcon: shopping_option.source_icon,
+            }),
+            // Use the nullish coalescing for the combined thumbnail value
+            // and then conditionally spread it to handle `undefined`
+            ...((shopping_option.thumbnail ??
+              shopping_option.serpapi_thumbnail) !== undefined && {
+              thumbnail:
+                shopping_option.thumbnail ?? shopping_option.serpapi_thumbnail,
+            }),
+            ...(shopping_option.delivery !== undefined && {
+              delivery: shopping_option.delivery,
+            }),
           },
           update: {}, // keep the first version we stored
         });
