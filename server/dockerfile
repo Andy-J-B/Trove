@@ -28,7 +28,7 @@ WORKDIR /app
 
 # 📋 Copy ONLY the compiled JS, production dependencies, and required files
 # 1. Copy package.json (to install production dependencies)
-COPY package.json ./
+COPY package*.json ./
 
 # 2. Install production dependencies (skipping dev dependencies)
 RUN npm ci --omit=dev
