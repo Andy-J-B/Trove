@@ -59,3 +59,9 @@ app-example
 
 # Kiro files
 .kiro/
+
+*/node_modules/
+
+*/.DS_Store
+/.DS_Store
+/server/.DS_Store
