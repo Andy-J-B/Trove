@@ -45,9 +45,31 @@ router.get("/", async (req, res, next) => {
 
     const categories = await prisma.category.findMany({
       where: { deviceId, isDeleted: false },
+      include: {
+        _count: {
+          select: {
+            products: {
+              where: { isDeleted: false }
+            }
+          }
+        }
+      },
       orderBy: { name: "asc" },
     });
-    res.json(categories);
+
+    // Map response to include itemCount field
+    const categoriesWithCount = categories.map(cat => ({
+      id: cat.id,
+      deviceId: cat.deviceId,
+      name: cat.name,
+      description: cat.description,
+      isDeleted: cat.isDeleted,
+      createdAt: cat.createdAt,
+      updatedAt: cat.updatedAt,
+      itemCount: cat._count.products
+    }));
+
+    res.json(categoriesWithCount);
   } catch (e) {
     next(e);
   }

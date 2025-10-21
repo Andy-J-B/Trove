@@ -180,7 +180,7 @@ export default function HomeScreen() {
 
   return (
     <LinearGradient
-      colors={["#000000", "#070707", "#000000"]}
+      colors={["#0f0a1a", "#1a1625", "#0f0a1a"]}
       style={{ flex: 1 }}
     >
       <SafeAreaView style={{ flex: 1, paddingHorizontal: 12 }}>
@@ -199,13 +199,19 @@ export default function HomeScreen() {
           onPress={() => setAddOpen(true)}
           style={{
             position: "absolute",
-            bottom: 40,
-            alignSelf: "center",
-            width: 64,
-            height: 64,
-            borderRadius: 32,
+            bottom: 24,
+            right: 24,
+            width: 60,
+            height: 60,
+            borderRadius: 30,
+            backgroundColor: "#7c3aed",
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            elevation: 8,
           }}
-          textStyle={{ fontWeight: "800", fontSize: 30 }}
+          textStyle={{ fontWeight: "800", fontSize: 28, color: "#ffffff" }}
         />
       </SafeAreaView>
 
