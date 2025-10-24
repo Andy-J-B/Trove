@@ -14,7 +14,7 @@ import { AppButton } from "../components/ui/AppButton";
 import { useQueueProcessor } from "../hooks/use-queue-processor";
 import { BackHandler, Platform } from "react-native";
 import { getDeviceId } from "@/util/device";
-import { Alert } from "react-native";
+import { formatString } from "@/util/helper";
 
 const SERVER_URL =
   (Constants?.expoConfig?.extra &&
@@ -77,7 +77,7 @@ export default function HomeScreen() {
       await axios.post(
         `${SERVER_URL}/categories`,
         {
-          name: addName,
+          name: formatString(addName),
           description: addDesc,
         },
         {

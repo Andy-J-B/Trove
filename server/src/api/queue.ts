@@ -1,3 +1,4 @@
+// src/api/queue.ts
 import { Router } from "express";
 import { prisma } from "../lib/db.js";
 import { Queue } from "bullmq";
@@ -41,51 +42,65 @@ router.post("/", async (req: any, res: any) => {
       .json({ error: "Both url and deviceId are required." });
   }
 
+  // Calculate Job ID upfront
+  const hash = crypto.createHash("sha1").update(url).digest("hex");
+  const jobId = `${deviceId}-${hash}`;
+
   try {
     // 1️⃣  Ensure the device exists (idempotent upsert)
     await ensureDevice(deviceId);
 
-    // 2️⃣  Insert a QueueItem row (status = PENDING)
-    const queueItem = await prisma.queueItem.create({
-      data: {
-        deviceId,
-        url,
-        status: "PENDING",
+    // 2️⃣ Check for an existing QueueItem first
+    let queueItem = await prisma.queueItem.findUnique({
+      where: {
+        deviceId_url: { deviceId, url }, // requires @@unique([deviceId, url]) in schema
       },
     });
 
-    // 3️⃣  Enqueue a BullMQ job – we only need the QueueItem id.
-    const hash = crypto.createHash("sha1").update(url).digest("hex");
-    const jobId = `${deviceId}-${hash}`;
-    try {
-      await urlQueue.add("process", { queueItemId: queueItem.id }, { jobId });
-    } catch (e: any) {
-      // Bull‑MQ throws JobExistsError (code 0x1) if a job with the same jobId
-      // is already present (waiting, delayed, active, or completed with
-      // removeOnComplete = false). In that case we simply ignore it.
-      if (e?.code === "ERR_JOB_EXISTS") {
-        console.warn(`⚠️ Duplicate job ignored – jobId ${jobId}`);
-      } else {
-        throw e; // re‑throw anything else
+    if (queueItem) {
+      // If the item exists in the DB, it may or may not have been queued.
+      // Check BullMQ's status to ensure we don't re-queue completed jobs.
+      const bullmqJob = await urlQueue.getJob(jobId);
+
+      if (bullmqJob) {
+        // The job is known to both the DB and BullMQ. Do nothing.
+        console.warn(
+          `[PRODUCER] Duplicate request: QueueItem ${queueItem.id} already exists and BullMQ job ${jobId} is present. Returning 202.`
+        );
+        return res
+          .status(202)
+          .json({ ok: true, duplicate: true, queueItemId: queueItem.id });
       }
+
+      // If the item exists in the DB but is NOT in BullMQ, it means the previous attempt failed
+      // silently, was cleared, or never added. We should re-queue it.
+      console.warn(
+        `[PRODUCER] Re-queueing: Existing QueueItem ${queueItem.id} found, but BullMQ job ${jobId} is missing.`
+      );
+    } else {
+      // 3️⃣ Insert a NEW QueueItem row (status = PENDING)
+      queueItem = await prisma.queueItem.create({
+        data: {
+          deviceId,
+          url,
+          status: "PENDING",
+        },
+      });
+      console.log(`[PRODUCER] Created new QueueItem ID: ${queueItem.id}`);
     }
 
-    console.log("DONE QUEUE");
+    // 4️⃣ Enqueue a BullMQ job – Use the ID from the existing or newly created item.
+    await urlQueue.add(
+      "process",
+      { queueItemId: queueItem.id },
+      { jobId, attempts: 3 } // Added attempts for resilience
+    );
+
+    console.log(`[PRODUCER] Job added to BullMQ: ${jobId}`);
     return res.status(202).json({ ok: true, queueItemId: queueItem.id });
   } catch (err: any) {
-    // -------------------------------------------------
-    // Handle the Prisma unique‑constraint violation (duplicate QueueItem)
-    // -------------------------------------------------
-    if (err?.code === "P2002") {
-      // P2002 = Unique constraint failed (deviceId + url already exists)
-      console.warn(
-        `⚠️ QueueItem already exists for device ${deviceId}, url ${url}`
-      );
-      // We still return 202 – the client already knows it “sent” the URL.
-      return res.status(202).json({ ok: true, duplicate: true });
-    }
-
-    console.error("❌ /queue error:", err);
+    // Catch any errors from ensureDevice, findUnique, create, or urlQueue.add
+    console.error(`❌ /queue error processing ${jobId}:`, err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });

@@ -14,6 +14,7 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { Category } from "../../constants/types";
 import { AppText } from "../ui/AppText";
+import { formatTitle } from "@/util/helper";
 
 interface Props {
   data: Category[];
@@ -58,7 +59,7 @@ export const CategoryGrid: React.FC<Props> = ({
 
         <View style={styles.cardInner}>
           <Feather name={item.iconName || "folder"} size={48} color="white" />
-          <AppText bold>{item.name}</AppText>
+          <AppText bold>{formatTitle(item.name)}</AppText>
           <Text style={styles.productCount}>
             {(item.productCount ?? 0) === 1
               ? `${item.productCount ?? 0} item`

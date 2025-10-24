@@ -19,6 +19,10 @@ async function setStatus(
   });
 }
 
+function formatString(toFormat: string) {
+  return toFormat.trim().toLowerCase();
+}
+
 /**
  * Core worker – transcript → Gemini → (outside‑transaction) SerpAPI → DB.
  */
@@ -33,11 +37,18 @@ async function processJob(job: Job) {
 
   await setStatus(queueItem.id, "PROCESSING");
 
+  console.log(
+    `[JOB ${queueItem.id}] Starting processing for URL: ${queueItem.url}`
+  ); // 💡 LOG
+
   try {
     // -------------------------------------------------
     // 1️⃣  Transcript
     // -------------------------------------------------
     const transcript = await getTranscript(queueItem.url);
+    console.log(
+      `[JOB ${queueItem.id}] Transcript fetched (length: ${transcript.length})`
+    ); // 💡 LOG
 
     // -------------------------------------------------
     // 2️⃣  Gemini → structured categories / products
@@ -46,51 +57,62 @@ async function processJob(job: Job) {
       transcript,
       queueItem.deviceId
     );
+    console.log(
+      `[JOB ${queueItem.id}] Gemini extracted ${geminiCategories.length} categories.`
+    ); // 💡 LOG
 
     // -------------------------------------------------
     // 3️⃣  First transaction: create/update Category + Product rows
     // -------------------------------------------------
-    // We collect every product we just created/updated so we can
-    // call SerpAPI for each of them *after* the transaction ends.
     const createdProducts: { id: string; name: string }[] = [];
 
     await prisma.$transaction(async (tx) => {
+      console.log(`[JOB ${queueItem.id}] Starting database transaction...`); // 💡 LOG
+
       for (const cat of geminiCategories) {
+        const formattedCatName = formatString(cat.name);
+        console.log(
+          `[JOB ${queueItem.id}] Processing Category: ${cat.name} (${formattedCatName})`
+        ); // 💡 LOG
+
         // ----- Upsert Category (device-scoped) -----
         const category = await tx.category.upsert({
           where: {
             deviceId_name: {
               deviceId: queueItem.deviceId,
-              name: cat.name,
+              name: formattedCatName,
             },
           },
           create: {
             deviceId: queueItem.deviceId,
-            name: cat.name,
+            name: formattedCatName,
             description: cat.description ?? null,
-            // New categories start with a count of 0 or the count of new products
             productCount: 0,
           },
           update: {}, // keep existing
         });
+        console.log(
+          `[JOB ${queueItem.id}] Category upserted. ID: ${category.id}`
+        ); // 💡 LOG
 
-        // Track how many *new* products are being created in this category
         let productsCreatedInThisCategory = 0;
 
         // ----- Upsert each Product in the Category -----
         for (const prod of cat.products) {
+          const productIdToUse = prod.id ?? `${category.id}-${prod.name}`;
+
           // Attempt to find the product first
           const existingProduct = await tx.product.findUnique({
-            where: { id: prod.id ?? `${category.id}-${prod.name}` },
+            where: { id: productIdToUse },
           });
 
-          // Upsert returns the fields we asked for via `select`
+          // Upsert the product
           const product = await tx.product.upsert({
             where: {
-              id: prod.id ?? `${category.id}-${prod.name}`,
+              id: productIdToUse,
             },
             create: {
-              id: prod.id ?? `${category.id}-${prod.name}`,
+              id: productIdToUse,
               categoryId: category.id,
               name: prod.name,
               tiktokUrl: queueItem.url,
@@ -100,21 +122,30 @@ async function processJob(job: Job) {
             update: {}, // keep first version
             select: {
               id: true,
-              name: true, // we need the name for the SerpAPI call later
+              name: true,
             },
           });
 
           // Check if this was a brand-new creation (i.e., no existing product found)
           if (!existingProduct) {
             productsCreatedInThisCategory++;
+            console.log(
+              `[JOB ${queueItem.id}] NEW Product created: ${product.name} (ID: ${product.id}). New count for category: ${productsCreatedInThisCategory}`
+            ); // 💡 LOG
+          } else {
+            console.log(
+              `[JOB ${queueItem.id}] EXISTING Product found/updated: ${product.name} (ID: ${product.id}). Count NOT incremented.`
+            ); // 💡 LOG
           }
 
-          // Remember the newly-created (or already-existing) product
           createdProducts.push({ id: product.id, name: product.name });
         }
 
-        // ----- 🛑 ADDED: Increment productCount if new products were created -----
+        // Check for product count update
         if (productsCreatedInThisCategory > 0) {
+          console.log(
+            `[JOB ${queueItem.id}] Incrementing productCount for Category ${category.id} by ${productsCreatedInThisCategory}`
+          ); // 💡 LOG
           await tx.category.update({
             where: { id: category.id },
             data: {
@@ -123,30 +154,45 @@ async function processJob(job: Job) {
               },
             },
           });
+          console.log(
+            `[JOB ${queueItem.id}] productCount incremented successfully.`
+          ); // 💡 LOG
+        } else {
+          console.log(
+            `[JOB ${queueItem.id}] productsCreatedInThisCategory is 0 for Category ${category.id}. productCount NOT incremented.`
+          ); // 💡 LOG
         }
       }
+      console.log(
+        `[JOB ${queueItem.id}] Transaction complete. Total unique products for SerpAPI: ${createdProducts.length}`
+      ); // 💡 LOG
     });
+
+    // ... rest of the function (SerpAPI, ShoppingUrl upsert, setStatus COMPLETED) remains the same
+    // ... The SerpAPI part is not directly related to the productCount issue, but keep it for completeness.
 
     // -------------------------------------------------
     // 4️⃣  SECOND phase – fetch shopping URLs **outside** the transaction
     // -------------------------------------------------
     for (const { id: productId, name: productName } of createdProducts) {
+      console.log(
+        `[JOB ${queueItem.id}] Fetching shopping URLs for product: ${productName} (ID: ${productId})`
+      ); // 💡 LOG
       // One API request per product (you can parallelize with Promise.all if you wish)
       const shoppingLinks = await fetchShoppingUrls(productName);
+      console.log(
+        `[JOB ${queueItem.id}] Found ${shoppingLinks.length} shopping links for ${productName}.`
+      ); // 💡 LOG
 
       // Upsert each shopping link – we can use the regular Prisma client now
       for (const shopping_option of shoppingLinks) {
+        const shoppingUrlId = `${productId}-${shopping_option.link}`;
         await prisma.shoppingUrl.upsert({
-          where: {
-            id: `${productId}-${shopping_option.link}`,
-          },
+          where: { id: shoppingUrlId },
           create: {
-            id: `${productId}-${shopping_option.link}`,
+            id: shoppingUrlId,
             productId,
             url: shopping_option.link,
-            // 🛑 FIX: Use conditional spreading for all optional/nullable fields
-            // Only include the property if the value is NOT undefined (or NOT null)
-
             ...(shopping_option.price !== undefined && {
               price: shopping_option.price,
             }),
@@ -156,8 +202,6 @@ async function processJob(job: Job) {
             ...(shopping_option.source_icon !== undefined && {
               sourceIcon: shopping_option.source_icon,
             }),
-            // Use the nullish coalescing for the combined thumbnail value
-            // and then conditionally spread it to handle `undefined`
             ...((shopping_option.thumbnail ??
               shopping_option.serpapi_thumbnail) !== undefined && {
               thumbnail:
@@ -176,10 +220,11 @@ async function processJob(job: Job) {
     // 5️⃣  Mark the queue item as COMPLETED
     // -------------------------------------------------
     await setStatus(queueItem.id, "COMPLETED");
+    console.log(`[JOB ${queueItem.id}] Successfully COMPLETED.`); // 💡 LOG
   } catch (e) {
+    // ... existing error handling
     console.error(`❌ Job ${job.id} failed:`, e);
     await setStatus(queueItem.id, "FAILED");
-    // Rethrow so BullMQ can apply its retry/back‑off logic
     throw e;
   }
 }
@@ -195,7 +240,9 @@ export function startQueueProcessor() {
     // attempts: 3,
     // backoff: { type: "exponential", delay: 5_000 },
   });
-
+  worker.on("ready", () =>
+    console.log("🎉 BullMQ Worker connected and ready to process jobs.")
+  ); // 💡 Add this log!
   worker.on("error", (err) => console.error("🚨 BullMQ worker error:", err));
   worker.on("completed", (job) => console.log(`✅ Job ${job.id} completed`));
   worker.on("failed", (job, err) =>
